@@ -100,11 +100,12 @@ export default function AppMain() {
         model: 'gemini-3.1-flash-lite-preview',
         contents: [
           {
-            text: `You are an expert web scraper. I will provide raw HTML from a short story magazine. Extract the title, author, source magazine, and the main story content. Format the story content as clean, normalized HTML using ONLY <p>, <em>, <strong>, and <hr> tags. Remove all images, links, ads, and CSS classes. Return a raw JSON object with the exact keys: title, author, source, and content.\n\nRAW HTML:\n${rawHtml.substring(0, 50000)}`,
+            text: `You are an expert web scraper. I will provide raw HTML from a short story magazine. Extract the title, author, source magazine, and the main story content. Format the story content as clean, normalized HTML using ONLY <p>, <em>, <strong>, and <hr> tags. Remove all images, links, ads, and CSS classes. Return a raw JSON object with the exact keys: title, author, source, and content.\n\nRAW HTML:\n${rawHtml.substring(0, 200000)}`,
           },
         ],
         config: {
           responseMimeType: 'application/json',
+          maxOutputTokens: 32768,
           responseSchema: {
             type: Type.OBJECT,
             properties: {
@@ -117,6 +118,15 @@ export default function AppMain() {
           },
         },
       });
+
+      const finishReason = response.candidates?.[0]?.finishReason;
+      if (finishReason && finishReason !== 'STOP') {
+        throw new Error(
+          finishReason === 'MAX_TOKENS'
+            ? 'The story was too long for the AI to extract in one pass. Try a shorter story, or contact the developer to raise the output cap.'
+            : `AI extraction stopped unexpectedly (finishReason: ${finishReason}).`,
+        );
+      }
 
       const jsonStr = response.text?.trim();
       if (!jsonStr) throw new Error('Failed to parse content with AI');

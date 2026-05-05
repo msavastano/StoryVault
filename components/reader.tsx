@@ -1,30 +1,51 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Story } from './library';
-import { ArrowLeft, ChevronLeft, ChevronRight, Moon, Sun, Coffee } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Type } from 'lucide-react';
 import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '@/components/auth-provider';
+import {
+  useReaderPreferences,
+  FONT_SIZE_PX,
+  LINE_HEIGHT,
+  MAX_WIDTH,
+  ReaderTheme,
+  ReaderFontFamily,
+  ReaderLineSpacing,
+  ReaderMargin,
+} from '@/hooks/use-reader-preferences';
 
-type Theme = 'light' | 'sepia' | 'dark';
+const THEME_CLASSES: Record<ReaderTheme, string> = {
+  light: 'bg-[#fcfcfc] text-[#1a1a1a]',
+  sepia: 'bg-[#f4ecd8] text-[#5b4636]',
+  dark: 'bg-[#121212] text-[#e0e0e0]',
+};
+
+const THEME_SWATCH: Record<ReaderTheme, string> = {
+  light: 'bg-[#fcfcfc] text-[#1a1a1a] border-gray-300',
+  sepia: 'bg-[#f4ecd8] text-[#5b4636] border-[#d9c9a8]',
+  dark: 'bg-[#121212] text-[#e0e0e0] border-gray-700',
+};
 
 export function Reader({ story, onBack }: { story: Story; onBack: () => void }) {
   const { user } = useAuth();
+  const { prefs, update } = useReaderPreferences();
   const [currentPage, setCurrentPage] = useState(story.currentPage || 0);
-  const [theme, setTheme] = useState<Theme>('light');
+  const [showSettings, setShowSettings] = useState(false);
+  const settingsRef = useRef<HTMLDivElement>(null);
 
   const pages = useMemo(() => {
     const elements = story.content.match(/<p[\s\S]*?<\/p>|<hr>/gi) || [];
     const result = [];
-    for (let i = 0; i < elements.length; i += 4) { // 4 paragraphs per page
+    for (let i = 0; i < elements.length; i += 4) {
       result.push(elements.slice(i, i + 4).join('\n'));
     }
     if (result.length === 0) result.push(story.content);
     return result;
   }, [story.content]);
 
-  // Ensure initial page isn't out of bounds if chunking changes
   useEffect(() => {
     if (currentPage >= pages.length) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -32,29 +53,33 @@ export function Reader({ story, onBack }: { story: Story; onBack: () => void }) 
     }
   }, [pages.length, currentPage]);
 
+  useEffect(() => {
+    if (!showSettings) return;
+    const handler = (e: MouseEvent) => {
+      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
+        setShowSettings(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showSettings]);
+
   const handlePageChange = async (newPage: number) => {
     setCurrentPage(newPage);
     if (!user) return;
-    
+
     try {
       const storyRef = doc(db, `users/${user.uid}/stories/${story.id}`);
-      await updateDoc(storyRef, {
-        currentPage: newPage
-      });
+      await updateDoc(storyRef, { currentPage: newPage });
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}/stories/${story.id}`);
     }
   };
 
-  const themeClasses = {
-    light: 'bg-[#fcfcfc] text-[#1a1a1a]',
-    sepia: 'bg-[#f4ecd8] text-[#5b4636]',
-    dark: 'bg-[#121212] text-[#e0e0e0]',
-  };
+  const fontFamilyClass = prefs.fontFamily === 'serif' ? 'font-serif' : 'font-sans';
 
   return (
-    <div className={`min-h-screen flex flex-col transition-colors duration-300 ${themeClasses[theme]}`}>
-      {/* Top Bar */}
+    <div className={`min-h-screen flex flex-col transition-colors duration-300 ${THEME_CLASSES[prefs.theme]}`}>
       <header className="px-6 py-4 flex items-center justify-between border-b border-current/10 sticky top-0 bg-inherit z-10">
         <button
           onClick={onBack}
@@ -62,52 +87,47 @@ export function Reader({ story, onBack }: { story: Story; onBack: () => void }) 
         >
           <ArrowLeft className="w-4 h-4" /> Back to Library
         </button>
-        
+
         <div className="flex items-center gap-4">
           <div className="hidden sm:flex text-sm opacity-60">
             Page {currentPage + 1} of {pages.length}
           </div>
-          <div className="flex items-center gap-2 bg-current/5 p-1 rounded-full">
+          <div ref={settingsRef} className="relative">
             <button
-              onClick={() => setTheme('light')}
-              className={`p-1.5 rounded-full ${theme === 'light' ? 'bg-current/10' : 'opacity-50 hover:opacity-100'}`}
-              title="Light theme"
+              onClick={() => setShowSettings((s) => !s)}
+              className="p-2 rounded-full hover:bg-current/5 opacity-70 hover:opacity-100 transition-opacity flex items-center gap-1"
+              title="Reading settings"
+              aria-expanded={showSettings}
             >
-              <Sun className="w-4 h-4" />
+              <Type className="w-4 h-4" />
+              <span className="text-xs font-semibold tracking-tight">Aa</span>
             </button>
-            <button
-              onClick={() => setTheme('sepia')}
-              className={`p-1.5 rounded-full ${theme === 'sepia' ? 'bg-current/10' : 'opacity-50 hover:opacity-100'}`}
-              title="Sepia theme"
-            >
-              <Coffee className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setTheme('dark')}
-              className={`p-1.5 rounded-full ${theme === 'dark' ? 'bg-current/10' : 'opacity-50 hover:opacity-100'}`}
-              title="Dark theme"
-            >
-              <Moon className="w-4 h-4" />
-            </button>
+            {showSettings && (
+              <SettingsPopover
+                prefs={prefs}
+                onChange={update}
+              />
+            )}
           </div>
         </div>
       </header>
 
-      {/* Reader Content */}
-      <main className="flex-1 flex flex-col max-w-3xl mx-auto w-full px-6 py-12 md:py-24 font-serif">
+      <main className={`flex-1 flex flex-col mx-auto w-full px-6 py-12 md:py-24 ${fontFamilyClass}`} style={{ maxWidth: MAX_WIDTH[prefs.margin] }}>
         <div className="mb-12 md:mb-16 text-center">
           <h1 className="text-3xl md:text-5xl font-bold mb-4 tracking-tight leading-tight">{story.title}</h1>
           <p className="text-lg opacity-80 italic">{story.author}</p>
         </div>
 
-        <div 
-          className="prose prose-lg md:prose-xl max-w-none text-current prose-p:leading-relaxed prose-p:mb-8"
-          dangerouslySetInnerHTML={{ __html: pages[currentPage] || '' }} 
+        <div
+          className="max-w-none [&_p]:mb-[1em] [&_em]:italic [&_strong]:font-semibold [&_hr]:my-10 [&_hr]:border-current/20"
+          style={{
+            fontSize: `${FONT_SIZE_PX[prefs.fontSize]}px`,
+            lineHeight: LINE_HEIGHT[prefs.lineSpacing],
+          }}
+          dangerouslySetInnerHTML={{ __html: pages[currentPage] || '' }}
         />
-        
       </main>
 
-      {/* Bottom Pagination Bar */}
       <footer className="px-6 py-6 flex items-center justify-center gap-8 border-t border-current/10 bg-inherit sticky bottom-0 z-10">
         <button
           onClick={() => handlePageChange(Math.max(0, currentPage - 1))}
@@ -127,6 +147,151 @@ export function Reader({ story, onBack }: { story: Story; onBack: () => void }) 
           Next <ChevronRight className="w-5 h-5" />
         </button>
       </footer>
+    </div>
+  );
+}
+
+function SettingsPopover({
+  prefs,
+  onChange,
+}: {
+  prefs: ReturnType<typeof useReaderPreferences>['prefs'];
+  onChange: (patch: Partial<ReturnType<typeof useReaderPreferences>['prefs']>) => void;
+}) {
+  return (
+    <div
+      className="absolute right-0 top-full mt-2 w-72 rounded-2xl shadow-xl border border-current/10 bg-white text-gray-900 p-4 z-20"
+      role="dialog"
+    >
+      <Row label="Font size">
+        <Stepper
+          value={prefs.fontSize}
+          min={0}
+          max={FONT_SIZE_PX.length - 1}
+          onChange={(fontSize) => onChange({ fontSize })}
+          renderValue={(v) => `${FONT_SIZE_PX[v]}px`}
+        />
+      </Row>
+
+      <Row label="Font">
+        <SegmentedToggle<ReaderFontFamily>
+          value={prefs.fontFamily}
+          options={[
+            { value: 'serif', label: 'Serif', className: 'font-serif' },
+            { value: 'sans', label: 'Sans', className: 'font-sans' },
+          ]}
+          onChange={(fontFamily) => onChange({ fontFamily })}
+        />
+      </Row>
+
+      <Row label="Theme">
+        <div className="flex gap-2">
+          {(['light', 'sepia', 'dark'] as ReaderTheme[]).map((t) => (
+            <button
+              key={t}
+              onClick={() => onChange({ theme: t })}
+              className={`flex-1 py-3 rounded-lg border-2 text-sm font-medium transition-all ${THEME_SWATCH[t]} ${prefs.theme === t ? 'ring-2 ring-indigo-500 ring-offset-2' : 'opacity-70 hover:opacity-100'}`}
+              aria-pressed={prefs.theme === t}
+            >
+              Aa
+            </button>
+          ))}
+        </div>
+      </Row>
+
+      <Row label="Line spacing">
+        <SegmentedToggle<ReaderLineSpacing>
+          value={prefs.lineSpacing}
+          options={[
+            { value: 'tight', label: 'Tight' },
+            { value: 'normal', label: 'Normal' },
+            { value: 'loose', label: 'Loose' },
+          ]}
+          onChange={(lineSpacing) => onChange({ lineSpacing })}
+        />
+      </Row>
+
+      <Row label="Margins" last>
+        <SegmentedToggle<ReaderMargin>
+          value={prefs.margin}
+          options={[
+            { value: 'narrow', label: 'Narrow' },
+            { value: 'normal', label: 'Normal' },
+            { value: 'wide', label: 'Wide' },
+          ]}
+          onChange={(margin) => onChange({ margin })}
+        />
+      </Row>
+    </div>
+  );
+}
+
+function Row({ label, children, last }: { label: string; children: React.ReactNode; last?: boolean }) {
+  return (
+    <div className={last ? '' : 'mb-4 pb-4 border-b border-gray-100'}>
+      <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{label}</div>
+      {children}
+    </div>
+  );
+}
+
+function Stepper({
+  value,
+  min,
+  max,
+  onChange,
+  renderValue,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  onChange: (v: number) => void;
+  renderValue: (v: number) => string;
+}) {
+  return (
+    <div className="flex items-center justify-between bg-gray-100 rounded-lg p-1">
+      <button
+        onClick={() => onChange(Math.max(min, value - 1))}
+        disabled={value <= min}
+        className="px-3 py-1.5 rounded-md hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed text-sm font-medium"
+        aria-label="Decrease"
+      >
+        A−
+      </button>
+      <span className="text-sm font-medium tabular-nums">{renderValue(value)}</span>
+      <button
+        onClick={() => onChange(Math.min(max, value + 1))}
+        disabled={value >= max}
+        className="px-3 py-1.5 rounded-md hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed text-base font-medium"
+        aria-label="Increase"
+      >
+        A+
+      </button>
+    </div>
+  );
+}
+
+function SegmentedToggle<T extends string>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T;
+  options: { value: T; label: string; className?: string }[];
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div className="flex bg-gray-100 rounded-lg p-1 gap-1">
+      {options.map((opt) => (
+        <button
+          key={opt.value}
+          onClick={() => onChange(opt.value)}
+          className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-colors ${opt.className || ''} ${value === opt.value ? 'bg-white shadow-sm text-gray-900' : 'text-gray-600 hover:text-gray-900'}`}
+          aria-pressed={value === opt.value}
+        >
+          {opt.label}
+        </button>
+      ))}
     </div>
   );
 }

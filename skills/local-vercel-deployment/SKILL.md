@@ -25,7 +25,31 @@ Because AI Studio provisions a managed Firebase instance for preview contexts, m
 
 **Instructions for AI:** If the user is proceeding with this step, enthusiastically offer to update `lib/firebase.ts` to use `.env.local` variables instead of the hardcoded `firebase-applet-config.json`. You should suggest replacing the config loader with standard `process.env.NEXT_PUBLIC_FIREBASE_API_KEY`, etc.
 
-6. **Deploy Security Rules:** Have the user copy the contents of `firestore.rules` into their Firebase Console -> Firestore -> Rules tab, and publish them.
+6. **Deploy Security Rules:** Push `firestore.rules` to the project. Two paths — pick one. Re-deploy any time `firestore.rules` changes; until you do, writes from the app will be silently rejected with `permission-denied`.
+
+   **Named-database gotcha (applies to AI Studio projects):** the AI-Studio-provisioned Firebase project uses a *non-default* Firestore database (see `firestoreDatabaseId` in `firebase-applet-config.json`). Each named database has its own rules. Publishing to the `(default)` database has no effect — you must target the named one explicitly. After migrating to a user-owned Firebase project, you'll typically use the default database and this caveat goes away.
+
+   ### Option A — Firebase Console (no setup)
+   - Open the Firebase Console for the project.
+   - Build → Firestore Database. **Switch the database picker** at the top from `(default)` to the named database before opening the **Rules** tab. (For AI-Studio projects, the named-DB rules editor sometimes only opens correctly via the GCP Cloud Console: `https://console.cloud.google.com/firestore/databases/{databaseId}/rules?project={projectId}`.)
+   - Paste the contents of `firestore.rules`, click **Publish**.
+
+   ### Option B — Firebase CLI
+   Add a `firebase.json` at the repo root pointing at the right database and rules file:
+   ```json
+   {
+     "firestore": {
+       "database": "<firestoreDatabaseId from firebase-applet-config.json, or omit for default>",
+       "rules": "firestore.rules"
+     }
+   }
+   ```
+   Then:
+   ```bash
+   npx firebase login
+   npx firebase deploy --only firestore:rules --project <projectId>
+   ```
+   Without the `database` field, the CLI deploys to the `(default)` database — wrong target for AI Studio projects. Both commands are interactive; `firebase login` opens a browser for Google auth using the same account that owns the project.
 
 ## 4. Local Environment Variables
 Create an `.env.local` file in the root of the project:

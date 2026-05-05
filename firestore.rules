@@ -28,6 +28,18 @@ service cloud.firestore {
              (!('currentPage' in data) || data.currentPage is number);
     }
 
+    // Validation Blueprint for ReaderPreferences
+    function isValidReaderPreferences(data) {
+      return data.keys().hasOnly(['fontSize', 'fontFamily', 'theme', 'lineSpacing', 'margin', 'updatedAt']) &&
+             data.keys().hasAll(['fontSize', 'fontFamily', 'theme', 'lineSpacing', 'margin', 'updatedAt']) &&
+             data.fontSize is number && data.fontSize >= 0 && data.fontSize <= 10 &&
+             data.fontFamily in ['serif', 'sans'] &&
+             data.theme in ['light', 'sepia', 'dark'] &&
+             data.lineSpacing in ['tight', 'normal', 'loose'] &&
+             data.margin in ['narrow', 'normal', 'wide'] &&
+             data.updatedAt == request.time;
+    }
+
     // Story match
     match /users/{userId}/stories/{storyId} {
       // Allow read (both list and get) if the user is the owner
@@ -47,13 +59,26 @@ service cloud.firestore {
                     isValidId(userId) && 
                     isValidId(storyId);
       
-      allow update: if isSignedIn() && 
-                    request.auth.uid == userId && 
-                    isValidId(userId) && 
+      allow update: if isSignedIn() &&
+                    request.auth.uid == userId &&
+                    isValidId(userId) &&
                     isValidId(storyId) &&
                     isValidStory(incoming()) &&
                     incoming().diff(existing()).affectedKeys().hasOnly(['currentPage']) &&
                     incoming().createdAt == existing().createdAt;
+    }
+
+    // Reader preferences — single doc per user at preferences/reader
+    match /users/{userId}/preferences/{prefId} {
+      allow read: if isSignedIn() &&
+                    request.auth.uid == userId &&
+                    isValidId(userId);
+
+      allow write: if isSignedIn() &&
+                    request.auth.uid == userId &&
+                    isValidId(userId) &&
+                    prefId == 'reader' &&
+                    isValidReaderPreferences(incoming());
     }
   }
 }
