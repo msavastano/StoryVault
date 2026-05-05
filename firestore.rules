@@ -1,0 +1,59 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Primitives
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isSignedIn() { return request.auth != null; }
+
+    // Validation Blueprint for Story
+    function isValidStory(data) {
+      return data.keys().hasAll(['title', 'author', 'source', 'content', 'createdAt']) &&
+             data.title is string && data.title.size() <= 1000 &&
+             data.author is string && data.author.size() <= 1000 &&
+             data.source is string && data.source.size() <= 2000 &&
+             data.content is string && data.content.size() <= 900000 &&
+             (!('wordCount' in data) || data.wordCount is number) &&
+             (!('totalPages' in data) || data.totalPages is number) &&
+             (!('currentPage' in data) || data.currentPage is number);
+    }
+
+    // Story match
+    match /users/{userId}/stories/{storyId} {
+      // Allow read (both list and get) if the user is the owner
+      allow read: if isSignedIn() && request.auth.uid == userId && isValidId(userId);
+      
+      // Allow create
+      allow create: if isSignedIn() && 
+                    request.auth.uid == userId && 
+                    isValidId(userId) && 
+                    isValidId(storyId) &&
+                    isValidStory(incoming()) &&
+                    incoming().createdAt == request.time;
+                    
+      // Allow delete
+      allow delete: if isSignedIn() && 
+                    request.auth.uid == userId && 
+                    isValidId(userId) && 
+                    isValidId(storyId);
+      
+      allow update: if isSignedIn() && 
+                    request.auth.uid == userId && 
+                    isValidId(userId) && 
+                    isValidId(storyId) &&
+                    isValidStory(incoming()) &&
+                    incoming().diff(existing()).affectedKeys().hasOnly(['currentPage']) &&
+                    incoming().createdAt == existing().createdAt;
+    }
+  }
+}

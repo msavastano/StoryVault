@@ -1,0 +1,6 @@
+{
+  "name": "StoryVault",
+  "description": "Read-It-Later library and e-reader app for short stories with AI extraction.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

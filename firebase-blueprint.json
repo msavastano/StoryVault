@@ -1,0 +1,26 @@
+{
+  "entities": {
+    "Story": {
+      "title": "Story",
+      "description": "A saved short story",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "author": { "type": "string" },
+        "source": { "type": "string" },
+        "content": { "type": "string" },
+        "wordCount": { "type": "number" },
+        "totalPages": { "type": "number" },
+        "currentPage": { "type": "number" },
+        "createdAt": { "type": "timestamp" }
+      },
+      "required": ["title", "author", "source", "content", "wordCount", "totalPages", "currentPage", "createdAt"]
+    }
+  },
+  "firestore": {
+    "users/{userId}/stories/{storyId}": {
+      "schema": { "$ref": "#/entities/Story" },
+      "description": "Stories saved by the user"
+    }
+  }
+}
