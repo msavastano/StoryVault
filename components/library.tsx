@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/components/auth-provider';
 import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, Timestamp } from 'firebase/firestore';
-import { fetchRawHtml } from '@/lib/fetchHtml';
+import { fetchArticleContent } from '@/lib/fetchHtml';
 import { GoogleGenAI, Type } from '@google/genai';
 import { Reader } from '@/components/reader';
 import { BookOpen, LogOut, Plus, Trash2, Library, Book } from 'lucide-react';
@@ -89,8 +89,13 @@ export default function AppMain() {
         throw new Error('Missing Gemini API Key in the environment. Please configure it.');
       }
 
-      // Fetch HTML via Server Action to bypass CORS
-      const rawHtml = await fetchRawHtml(urlInput);
+      // Fetch via Jina Reader (Server Action) — bypasses Cloudflare bot
+      // challenges and returns clean markdown.
+      const fetchResult = await fetchArticleContent(urlInput);
+      if (!fetchResult.ok) {
+        throw new Error(fetchResult.message);
+      }
+      const articleContent = fetchResult.content;
 
       const ai = new GoogleGenAI({
         apiKey: apiKey,
@@ -100,7 +105,7 @@ export default function AppMain() {
         model: 'gemini-3.1-flash-lite-preview',
         contents: [
           {
-            text: `You are an expert web scraper. I will provide raw HTML from a short story magazine. Extract the title, author, source magazine, and the main story content. Format the story content as clean, normalized HTML using ONLY <p>, <em>, <strong>, and <hr> tags. Remove all images, links, ads, and CSS classes. Return a raw JSON object with the exact keys: title, author, source, and content.\n\nRAW HTML:\n${rawHtml.substring(0, 200000)}`,
+            text: `You are an expert text extractor. I will provide article content (typically markdown, sometimes HTML) from a short story magazine. Extract the title, author, source magazine, and the main story content. Format the story content as clean, normalized HTML using ONLY <p>, <em>, <strong>, and <hr> tags. Strip any author bio, comments, navigation, or non-story content. Return a raw JSON object with the exact keys: title, author, source, and content.\n\nSOURCE CONTENT:\n${articleContent.substring(0, 200000)}`,
           },
         ],
         config: {

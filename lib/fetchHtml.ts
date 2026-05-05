@@ -1,21 +1,44 @@
 'use server';
 
-export async function fetchRawHtml(url: string) {
+export type FetchArticleResult =
+  | { ok: true; content: string }
+  | { ok: false; message: string };
+
+// Routes through Jina Reader (https://r.jina.ai), which runs a headless browser
+// and returns clean markdown. This bypasses Cloudflare/bot challenges that block
+// plain server-side fetch from datacenter IPs (e.g. Uncanny Magazine, most
+// publishers behind Cloudflare). Returns a result object instead of throwing
+// so the actual error message survives Next.js's Server Action redaction in prod.
+export async function fetchArticleContent(url: string): Promise<FetchArticleResult> {
+  const proxied = `https://r.jina.ai/${url}`;
   try {
-    const res = await fetch(url, {
+    const res = await fetch(proxied, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-      }
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
     });
-    
-    if (!res.ok) throw new Error(`Failed to fetch URL directly: ${res.status} ${res.statusText}`);
-    
-    const rawHtml = await res.text();
-    if (!rawHtml) throw new Error('No content extracted from the URL');
-    
-    return rawHtml;
+
+    if (!res.ok) {
+      return {
+        ok: false,
+        message: `Reader proxy returned ${res.status} ${res.statusText} for ${url}.`,
+      };
+    }
+
+    const content = await res.text();
+    if (!content || content.length < 200) {
+      return {
+        ok: false,
+        message: `Reader proxy returned no usable content (${content.length} chars). The source may be paywalled, gated, or blocking automated access.`,
+      };
+    }
+
+    return { ok: true, content };
   } catch (error) {
-    console.error('Fetch error:', error);
-    throw error;
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : String(error),
+    };
   }
 }
