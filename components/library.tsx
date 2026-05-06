@@ -7,13 +7,14 @@ import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, delete
 import { fetchArticleContent } from '@/lib/fetchHtml';
 import { GoogleGenAI, Type } from '@google/genai';
 import { Reader } from '@/components/reader';
-import { BookOpen, LogOut, Plus, Trash2, Library, Book } from 'lucide-react';
+import { BookOpen, LogOut, Plus, Trash2, Library, Book, ExternalLink } from 'lucide-react';
 
 export interface Story {
   id: string;
   title: string;
   author: string;
   source: string;
+  sourceUrl?: string;
   content: string;
   wordCount?: number;
   totalPages?: number;
@@ -151,6 +152,7 @@ export default function AppMain() {
         title: extracted.title,
         author: extracted.author,
         source: extracted.source,
+        sourceUrl: urlInput.trim(),
         content: extracted.content,
         wordCount,
         totalPages,
@@ -254,7 +256,7 @@ export default function AppMain() {
               {stories.map((story) => {
                 const total = story.totalPages || 1;
                 const current = story.currentPage || 0;
-                const progressPercentage = Math.round(((current + 1) / total) * 100);
+                const progressPercentage = total <= 1 ? (current === 0 ? 0 : 100) : Math.round((current / (total - 1)) * 100);
                 
                 return (
                   <div
@@ -272,7 +274,21 @@ export default function AppMain() {
                     <div className="flex-1">
                       <h3 className="font-bold text-lg text-gray-900 leading-tight mb-2 pr-8">{story.title}</h3>
                       <p className="text-sm font-medium text-indigo-600 mb-1">{story.author}</p>
-                      <p className="text-xs text-gray-500 uppercase tracking-wider mb-4">{story.source}</p>
+                      <div className="flex items-center gap-2 mb-4">
+                        <p className="text-xs text-gray-500 uppercase tracking-wider">{story.source}</p>
+                        {story.sourceUrl && (
+                          <a
+                            href={story.sourceUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-gray-400 hover:text-indigo-600 transition-colors"
+                            title="Open original article"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                        )}
+                      </div>
                     </div>
                     {/* Progress Bar & Meta footer */}
                     <div className="mt-4 pt-4 border-t flex flex-col gap-2">

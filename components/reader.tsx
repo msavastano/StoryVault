@@ -66,6 +66,7 @@ export function Reader({ story, onBack }: { story: Story; onBack: () => void }) 
 
   const handlePageChange = async (newPage: number) => {
     setCurrentPage(newPage);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     if (!user) return;
 
     try {
