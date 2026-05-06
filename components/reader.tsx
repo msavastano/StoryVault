@@ -99,8 +99,8 @@ export function Reader({ story, onBack }: { story: Story; onBack: () => void }) 
 
   const bodyFontFamily =
     prefs.fontFamily === 'sans'
-      ? 'system-ui, -apple-system, "Segoe UI", sans-serif'
-      : "'Newsreader', Georgia, serif";
+      ? "'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif"
+      : "'Lora', Georgia, serif";
 
   const innerMaxWidth = MAX_WIDTH[prefs.margin];
 
@@ -243,7 +243,7 @@ function SettingsPopover({
           <button
             type="button"
             className={`opt${prefs.fontFamily === 'serif' ? ' active' : ''}`}
-            style={{ fontFamily: "'Newsreader', Georgia, serif" }}
+            style={{ fontFamily: "'Lora', Georgia, serif" }}
             onClick={() => onChange({ fontFamily: 'serif' as ReaderFontFamily })}
           >
             Serif
@@ -251,7 +251,7 @@ function SettingsPopover({
           <button
             type="button"
             className={`opt${prefs.fontFamily === 'sans' ? ' active' : ''}`}
-            style={{ fontFamily: 'system-ui, sans-serif' }}
+            style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
             onClick={() => onChange({ fontFamily: 'sans' as ReaderFontFamily })}
           >
             Sans

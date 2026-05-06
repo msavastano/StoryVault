@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,300;1,6..72,400;1,6..72,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,700&family=Inter:wght@400;500;600&display=swap');
 
 /* ── Academic Minimalism tokens ─────────────────────────────── */
 :root {
@@ -41,9 +41,9 @@
   --shadow-md:  0 4px 8px -2px rgba(40, 34, 24, 0.10), 0 2px 4px -2px rgba(40, 34, 24, 0.06);
   --shadow-lg:  0 8px 16px -4px rgba(40, 34, 24, 0.12), 0 4px 8px -4px rgba(40, 34, 24, 0.08);
 
-  --font-serif:  'Newsreader', 'Georgia', serif;
+  --font-serif:  'Lora', 'Georgia', serif;
   --font-mono:   ui-monospace, 'Cascadia Code', 'Fira Code', monospace;
-  --font-sans:   system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-sans:   'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
 
   --transition-fast:   150ms ease-out;
   --transition-base:   200ms ease-out;
