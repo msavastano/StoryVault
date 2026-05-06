@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>StoryVault — Academic Minimalism</title>
+<link rel="stylesheet" href="colors_and_type.css" />
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #efe9dc; }
+  * { box-sizing: border-box; }
+
+  /* ── Canvas board look ─────────────────────────────────────── */
+  .board { background: #efe9dc; }
+
+  /* ── Reusable StoryVault tokens ────────────────────────────── */
+  .sv-wordmark {
+    font-family: var(--font-serif);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--color-text);
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.5rem;
+  }
+  .sv-wordmark .mark {
+    display: inline-block;
+    width: 22px; height: 22px;
+    position: relative;
+    transform: translateY(3px);
+  }
+  .sv-wordmark .mark::before,
+  .sv-wordmark .mark::after {
+    content: ""; position: absolute; top: 0; bottom: 0;
+    background: var(--color-primary);
+  }
+  .sv-wordmark .mark::before {
+    left: 2px; width: 3px;
+    box-shadow: 6px 0 0 var(--color-primary), 12px 0 0 var(--color-primary), 18px 0 0 var(--color-outline);
+  }
+  .sv-wordmark .mark::after {
+    left: 0; right: 0; top: auto; height: 1px; bottom: -3px;
+    background: var(--color-outline);
+  }
+
+  .sv-rule { height: 1px; background: var(--color-outline-variant); border: 0; }
+  .sv-thin-rule { height: 1px; background: var(--color-outline); border: 0; }
+
+  .sv-overline {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-text-subtle);
+  }
+
+  /* ── Buttons ───────────────────────────────────────────────── */
+  .btn {
+    font-family: var(--font-serif);
+    font-weight: 500;
+    border-radius: var(--radius);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 18px;
+    font-size: 15px;
+    line-height: 1;
+  }
+  .btn-primary { background: var(--color-primary); color: var(--color-on-primary); }
+  .btn-primary:hover { background: #4d4840; }
+  .btn-ghost { background: transparent; color: var(--color-text-muted); border-color: var(--color-outline); }
+  .btn-ghost:hover { background: var(--color-surface-container); }
+  .btn-icon { padding: 8px; border-radius: var(--radius); }
+
+  /* ───────────────────────────────────────────────────────────────
+     SCREEN 1 · Sign in
+     ─────────────────────────────────────────────────────────────── */
+  .signin {
+    width: 100%; height: 100%;
+    background:
+      radial-gradient(ellipse 600px 320px at 50% 18%, #fcf9f6 0%, transparent 70%),
+      var(--color-background);
+    position: relative;
+    display: flex; flex-direction: column;
+    padding: 56px;
+    overflow: hidden;
+  }
+  .signin .corner-mark {
+    position: absolute; top: 36px; left: 56px;
+    display: flex; align-items: center; gap: 10px;
+    font-family: var(--font-serif);
+    font-size: 13px; color: var(--color-text-subtle);
+    letter-spacing: 0.04em;
+  }
+  .signin .corner-mark .dot { width: 6px; height: 6px; background: var(--color-primary); border-radius: 50%; }
+  .signin .signature {
+    position: absolute; top: 36px; right: 56px;
+    font-family: var(--font-serif); font-style: italic;
+    font-size: 13px; color: var(--color-text-subtle);
+  }
+  .signin .center {
+    margin: auto; max-width: 580px; text-align: center;
+    position: relative;
+  }
+  .signin .frontispiece {
+    display: inline-block;
+    padding: 22px 28px;
+    border-top: 1px solid var(--color-outline);
+    border-bottom: 1px solid var(--color-outline);
+    margin-bottom: 36px;
+  }
+  .signin .frontispiece .roman {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: 14px;
+    color: var(--color-text-subtle);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  .signin h1.title {
+    font-size: 84px;
+    font-weight: 400;
+    line-height: 0.95;
+    letter-spacing: -0.04em;
+    margin: 0 0 8px 0;
+    color: var(--color-text);
+  }
+  .signin h1.title em {
+    font-style: italic;
+    font-weight: 400;
+    color: var(--color-primary);
+  }
+  .signin .subtitle {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: 22px;
+    color: var(--color-text-muted);
+    line-height: 1.45;
+    max-width: 460px;
+    margin: 0 auto 44px;
+  }
+  .signin .ornament {
+    color: var(--color-outline);
+    font-size: 18px;
+    margin: 16px 0 28px;
+    letter-spacing: 0.6em;
+  }
+  .signin .signin-btn {
+    display: inline-flex; align-items: center; gap: 14px;
+    font-family: var(--font-serif);
+    font-size: 17px;
+    font-weight: 500;
+    color: var(--color-on-primary);
+    background: var(--color-primary);
+    border: 1px solid var(--color-primary);
+    border-radius: var(--radius);
+    padding: 14px 26px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    box-shadow: var(--shadow-sm);
+  }
+  .signin .signin-btn:hover { background: #4d4840; }
+  .signin .signin-btn .g {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: #fff;
+    color: #4285f4;
+    font-weight: 700;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    font-family: var(--font-sans);
+  }
+  .signin .footnote {
+    margin-top: 56px;
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: 13px;
+    color: var(--color-text-subtle);
+  }
+  .signin .footnote sup { font-style: normal; }
+  .signin .marginalia {
+    position: absolute;
+    bottom: 56px; left: 56px;
+    font-family: var(--font-serif);
+    font-size: 12px;
+    color: var(--color-text-subtle);
+    line-height: 1.5;
+    max-width: 200px;
+    border-left: 1px solid var(--color-outline-variant);
+    padding-left: 14px;
+  }
+  .signin .page-no {
+    position: absolute;
+    bottom: 56px; right: 56px;
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: 12px;
+    color: var(--color-text-subtle);
+    letter-spacing: 0.12em;
+  }
+
+  /* ───────────────────────────────────────────────────────────────
+     SCREEN 2 · Library
+     ─────────────────────────────────────────────────────────────── */
+  .lib {
+    width: 100%; height: 100%;
+    background: var(--color-background);
+    overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .lib-header {
+    background: var(--color-background);
+    padding: 22px 56px 18px;
+    border-bottom: 1px solid var(--color-outline);
+    display: flex; align-items: center; justify-content: space-between;
+    position: relative;
+  }
+  .lib-header::after {
+    content: ""; position: absolute; left: 56px; right: 56px; bottom: -4px;
+    height: 1px; background: var(--color-outline-variant);
+  }
+  .lib-header .left { display: flex; align-items: baseline; gap: 18px; }
+  .lib-header .vol {
+    font-family: var(--font-serif); font-style: italic;
+    font-size: 13px; color: var(--color-text-subtle);
+    letter-spacing: 0.06em;
+  }
+  .lib-header .right {
+    display: flex; align-items: center; gap: 18px;
+    font-family: var(--font-serif); font-size: 14px;
+    color: var(--color-text-muted);
+  }
+  .lib-header .email { font-style: italic; }
+  .lib-header .icon-btn {
+    width: 32px; height: 32px;
+    border-radius: var(--radius);
+    background: transparent;
+    border: 1px solid transparent;
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    color: var(--color-text-muted);
+  }
+  .lib-header .icon-btn:hover { background: var(--color-surface-container); border-color: var(--color-outline-variant); }
+
+  .lib-body {
+    flex: 1; overflow-y: auto;
+    padding: 40px 56px 56px;
+  }
+
+  /* Add story panel — styled as a librarian's intake card */
+  .intake {
+    background: var(--color-surface);
+    border: 1px solid var(--color-outline);
+    border-radius: var(--radius);
+    padding: 28px 32px;
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    margin-bottom: 56px;
+  }
+  .intake::before {
+    content: ""; position: absolute;
+    top: 10px; left: 10px; right: 10px; bottom: 10px;
+    border: 1px solid var(--color-outline-variant);
+    border-radius: 4px;
+    pointer-events: none;
+  }
+  .intake .intake-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .intake h2 {
+    font-size: 22px; font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--color-text);
+    margin: 0;
+  }
+  .intake .intake-meta {
+    font-style: italic;
+    font-size: 13px;
+    color: var(--color-text-subtle);
+  }
+  .intake form {
+    display: flex; align-items: stretch; gap: 12px;
+  }
+  .intake .input-wrap {
+    flex: 1;
+    display: flex; align-items: center;
+    gap: 12px;
+    background: var(--color-surface-container-low);
+    border: 1px solid var(--color-outline-variant);
+    border-radius: var(--radius);
+    padding: 0 16px;
+    transition: border-color var(--transition-fast);
+  }
+  .intake .input-wrap:focus-within { border-color: var(--color-primary); }
+  .intake .input-wrap .prefix {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--color-text-subtle);
+    letter-spacing: 0.05em;
+    border-right: 1px solid var(--color-outline-variant);
+    padding-right: 12px;
+    line-height: 1;
+  }
+  .intake input {
+    flex: 1;
+    background: transparent;
+    border: 0; outline: 0;
+    font-family: var(--font-serif);
+    font-size: 17px;
+    color: var(--color-text);
+    padding: 14px 0;
+  }
+  .intake input::placeholder {
+    color: var(--color-text-subtle);
+    font-style: italic;
+  }
+  .intake .add-btn {
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    border: 0;
+    border-radius: var(--radius);
+    font-family: var(--font-serif);
+    font-size: 16px;
+    font-weight: 500;
+    padding: 0 26px;
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 10px;
+    transition: background var(--transition-fast);
+  }
+  .intake .add-btn:hover { background: #4d4840; }
+  .intake .add-btn .arrow { font-size: 20px; line-height: 1; transform: translateY(-1px); }
+
+  /* Library section */
+  .lib-section-head {
+    display: flex; align-items: end; justify-content: space-between;
+    margin-bottom: 24px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--color-outline);
+    position: relative;
+  }
+  .lib-section-head::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: -4px;
+    height: 1px; background: var(--color-outline-variant);
+  }
+  .lib-section-head h2 {
+    font-size: 36px; font-weight: 600;
+    letter-spacing: -0.02em;
+    margin: 0;
+    line-height: 1;
+  }
+  .lib-section-head h2 .num {
+    font-style: italic;
+    font-weight: 400;
+    color: var(--color-text-subtle);
+    margin-left: 14px;
+    font-size: 24px;
+    letter-spacing: 0;
+  }
+  .lib-section-head .filters {
+    display: flex; align-items: center; gap: 22px;
+    font-family: var(--font-serif);
+    font-size: 14px;
+    color: var(--color-text-muted);
+  }
+  .lib-section-head .filters .item {
+    cursor: pointer;
+    padding-bottom: 4px;
+    border-bottom: 1px solid transparent;
+  }
+  .lib-section-head .filters .item.active {
+    border-bottom-color: var(--color-primary);
+    color: var(--color-text);
+    font-weight: 500;
+  }
+  .lib-section-head .filters .item:hover { color: var(--color-text); }
+
+  /* Story cards — like card-catalogue entries */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+  }
+  .card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-outline);
+    border-radius: var(--radius);
+    padding: 24px 26px 22px;
+    cursor: pointer;
+    position: relative;
+    display: flex; flex-direction: column;
+    transition: all var(--transition-base);
+    min-height: 240px;
+  }
+  .card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+  }
+  .card .corner-num {
+    position: absolute;
+    top: 16px; right: 18px;
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: 12px;
+    color: var(--color-text-subtle);
+    letter-spacing: 0.06em;
+  }
+  .card .source-overline {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-text-subtle);
+    margin-bottom: 14px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .card .source-overline .ext {
+    color: var(--color-text-subtle);
+    font-size: 11px;
+    transform: translateY(-1px);
+  }
+  .card h3.title {
+    font-size: 24px;
+    font-weight: 600;
+    line-height: 1.15;
+    letter-spacing: -0.015em;
+    color: var(--color-text);
+    margin: 0 0 10px;
+    text-wrap: balance;
+  }
+  .card .author {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: 16px;
+    color: var(--color-text-muted);
+    margin-bottom: auto;
+  }
+  .card .author::before { content: "by "; font-style: normal; color: var(--color-text-subtle); font-size: 13px; }
+  .card .meta-foot {
+    margin-top: 22px;
+    padding-top: 14px;
+    border-top: 1px solid var(--color-outline-variant);
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .card .progress {
+    height: 2px;
+    background: var(--color-surface-container-high);
+    position: relative;
+    overflow: hidden;
+  }
+  .card .progress .bar {
+    position: absolute; left: 0; top: 0; bottom: 0;
+    background: var(--color-primary);
+  }
+  .card .meta-row {
+    display: flex; justify-content: space-between;
+    font-family: var(--font-serif);
+    font-size: 12px;
+    color: var(--color-text-subtle);
+    letter-spacing: 0.02em;
+  }
+  .card .meta-row .pct { font-style: italic; }
+  .card .meta-row .words { font-variant-numeric: tabular-nums; }
+
+  /* ───────────────────────────────────────────────────────────────
+     SCREEN 3 · Reader
+     ─────────────────────────────────────────────────────────────── */
+  .reader {
+    width: 100%; height: 100%;
+    background: var(--color-surface);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    position: relative;
+  }
+  .reader-header {
+    padding: 18px 56px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid var(--color-outline-variant);
+  }
+  .reader-header .back {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: var(--font-serif);
+    font-size: 14px;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    background: none; border: 0;
+  }
+  .reader-header .back:hover { color: var(--color-text); }
+  .reader-header .center-meta {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: 13px;
+    color: var(--color-text-subtle);
+    letter-spacing: 0.04em;
+  }
+  .reader-header .right {
+    display: flex; align-items: center; gap: 24px;
+  }
+  .reader-header .pageno {
+    font-family: var(--font-serif);
+    font-size: 13px;
+    color: var(--color-text-subtle);
+    font-style: italic;
+  }
+  .reader-header .aa-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: var(--font-serif);
+    font-size: 14px;
+    color: var(--color-text-muted);
+    background: transparent;
+    border: 1px solid var(--color-outline-variant);
+    border-radius: var(--radius);
+    padding: 6px 12px;
+    cursor: pointer;
+  }
+  .reader-header .aa-btn .small { font-size: 12px; }
+  .reader-header .aa-btn .large { font-size: 17px; font-weight: 600; }
+
+  .reader-body {
+    flex: 1;
+    overflow: hidden;
+    display: flex; justify-content: center;
+    padding: 64px 56px 32px;
+  }
+  .reader-page {
+    max-width: 640px;
+    width: 100%;
+  }
+  .reader-page .running-head {
+    display: flex; justify-content: space-between;
+    margin-bottom: 64px;
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: 12px;
+    color: var(--color-text-subtle);
+    letter-spacing: 0.08em;
+  }
+  .reader-page .chapter-mark {
+    text-align: center;
+    margin-bottom: 28px;
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: 13px;
+    color: var(--color-text-subtle);
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+  }
+  .reader-page h1.story-title {
+    font-size: 48px;
+    font-weight: 600;
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+    color: var(--color-text);
+    text-align: center;
+    margin: 0 0 14px;
+    text-wrap: balance;
+  }
+  .reader-page .byline {
+    text-align: center;
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: 18px;
+    color: var(--color-text-muted);
+    margin-bottom: 8px;
+  }
+  .reader-page .pub {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-text-subtle);
+    margin-bottom: 40px;
+  }
+  .reader-page .ornament-rule {
+    text-align: center;
+    color: var(--color-outline);
+    margin: 20px 0 36px;
+    letter-spacing: 0.6em;
+  }
+  .reader-page p.body-text {
+    font-size: 19px;
+    line-height: 1.7;
+    color: var(--color-text);
+    margin: 0 0 1em;
+  }
+  .reader-page p.body-text:first-of-type::first-line {
+    font-variant: small-caps;
+    letter-spacing: 0.06em;
+  }
+  .reader-page p.body-text.dropcap::first-letter {
+    float: left;
+    font-size: 64px;
+    line-height: 0.9;
+    padding: 4px 8px 0 0;
+    font-weight: 700;
+    color: var(--color-primary);
+  }
+
+  .reader-footer {
+    padding: 20px 56px 28px;
+    border-top: 1px solid var(--color-outline-variant);
+    display: flex; align-items: center; justify-content: center;
+    gap: 8px;
+    background: var(--color-surface);
+  }
+  .reader-footer .nav-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: var(--font-serif);
+    font-size: 15px;
+    color: var(--color-text-muted);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    padding: 10px 18px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+  .reader-footer .nav-btn:hover {
+    background: var(--color-surface-container-low);
+    color: var(--color-text);
+  }
+  .reader-footer .nav-btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+  .reader-footer .progress-track {
+    flex: 0 1 280px;
+    margin: 0 24px;
+    height: 1px;
+    background: var(--color-outline-variant);
+    position: relative;
+  }
+  .reader-footer .progress-track .indicator {
+    position: absolute; top: -3px;
+    width: 7px; height: 7px;
+    background: var(--color-primary);
+    border-radius: 50%;
+  }
+
+  /* ───────────────────────────────────────────────────────────────
+     SCREEN 4 · Reader settings (popover ON page)
+     ─────────────────────────────────────────────────────────────── */
+  .settings-screen {
+    width: 100%; height: 100%;
+    position: relative;
+    background: var(--color-surface);
+    overflow: hidden;
+  }
+  .settings-screen .underlay {
+    position: absolute; inset: 0;
+    background: var(--color-surface);
+    filter: brightness(0.985);
+    pointer-events: none;
+  }
+  .settings-screen .reader-header,
+  .settings-screen .reader-body,
+  .settings-screen .reader-footer { position: relative; }
+  .settings-screen .scrim {
+    position: absolute; inset: 0;
+    background: rgba(40,34,24,0.06);
+    pointer-events: none;
+    z-index: 5;
+  }
+  .popover {
+    position: absolute;
+    top: 70px; right: 56px;
+    width: 340px;
+    background: var(--color-surface-container-lowest);
+    border: 1px solid var(--color-outline);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    padding: 22px 22px 20px;
+    z-index: 10;
+  }
+  .popover::before {
+    content: "";
+    position: absolute;
+    top: -7px; right: 70px;
+    width: 12px; height: 12px;
+    background: var(--color-surface-container-lowest);
+    border-top: 1px solid var(--color-outline);
+    border-left: 1px solid var(--color-outline);
+    transform: rotate(45deg);
+  }
+  .popover h4 {
+    font-size: 17px;
+    font-weight: 600;
+    margin: 0 0 4px;
+    letter-spacing: -0.01em;
+  }
+  .popover .subtitle {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: 13px;
+    color: var(--color-text-subtle);
+    margin-bottom: 18px;
+  }
+  .popover .pop-rule { height: 1px; background: var(--color-outline-variant); border: 0; margin: 0 0 16px; }
+  .popover .row { margin-bottom: 18px; }
+  .popover .row:last-child { margin-bottom: 0; }
+  .popover .row-label {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--color-text-subtle);
+    margin-bottom: 8px;
+  }
+  .seg {
+    display: flex;
+    background: var(--color-surface-container);
+    border-radius: var(--radius-sm);
+    padding: 3px;
+    gap: 2px;
+  }
+  .seg .opt {
+    flex: 1;
+    text-align: center;
+    font-family: var(--font-serif);
+    font-size: 14px;
+    color: var(--color-text-muted);
+    padding: 8px 6px;
+    border-radius: 5px;
+    cursor: pointer;
+    border: 0;
+    background: transparent;
+    transition: background var(--transition-fast);
+  }
+  .seg .opt.active {
+    background: var(--color-surface-container-lowest);
+    color: var(--color-text);
+    box-shadow: var(--shadow-xs);
+    font-weight: 500;
+  }
+  .stepper {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--color-surface-container);
+    border-radius: var(--radius-sm);
+    padding: 3px;
+  }
+  .stepper button {
+    width: 36px; height: 32px;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    font-family: var(--font-serif);
+    font-weight: 600;
+    color: var(--color-text-muted);
+    border-radius: 5px;
+  }
+  .stepper button:hover { background: var(--color-surface-container-lowest); color: var(--color-text); }
+  .stepper .small { font-size: 12px; }
+  .stepper .large { font-size: 18px; }
+  .stepper .val {
+    font-family: var(--font-serif);
+    font-size: 14px;
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+  }
+  .themes { display: flex; gap: 10px; }
+  .theme-swatch {
+    flex: 1;
+    height: 56px;
+    border-radius: var(--radius);
+    border: 1.5px solid var(--color-outline-variant);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-serif);
+    font-size: 18px;
+    font-weight: 600;
+    transition: all var(--transition-fast);
+    position: relative;
+  }
+  .theme-swatch.light { background: #fcf9f6; color: #2a2620; }
+  .theme-swatch.parchment { background: #e7dcc4; color: #4a3f2a; }
+  .theme-swatch.dark { background: #2a2620; color: #f0ebe2; }
+  .theme-swatch.selected {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px var(--color-surface-container-lowest), 0 0 0 3.5px var(--color-primary);
+  }
+
+  /* ───────────────────────────────────────────────────────────────
+     Design canvas glue
+     ─────────────────────────────────────────────────────────────── */
+  .frame {
+    width: 100%; height: 100%;
+    position: relative;
+    overflow: hidden;
+    background: var(--color-surface);
+  }
+  /* SVG inline icons */
+  .ic { width: 16px; height: 16px; stroke-width: 1.5; fill: none; stroke: currentColor; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+
+<script type="text/babel">
+const { useState } = React;
+
+/* ─────────────────────────  ICONS  ───────────────────────── */
+const Icon = {
+  Plus:    () => <svg className="ic" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>,
+  Logout:  () => <svg className="ic" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>,
+  ExtLink: () => <svg className="ic" viewBox="0 0 24 24" style={{width:11,height:11}}><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>,
+  Back:    () => <svg className="ic" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>,
+  ChevL:   () => <svg className="ic" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>,
+  ChevR:   () => <svg className="ic" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>,
+  Search:  () => <svg className="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>,
+};
+
+/* ─────────────────────────  WORDMARK  ───────────────────────── */
+function Wordmark({ size = 22 }) {
+  // Three vertical strokes ("StoryVault" mark) — minimal, scholarly
+  const w = size, gap = size * 0.32, stroke = Math.max(2, size * 0.13);
+  return (
+    <span className="sv-wordmark" style={{fontSize: size * 0.95}}>
+      <span style={{display:'inline-flex', alignItems:'flex-end', gap: gap*0.5, height: w}}>
+        <span style={{width: stroke, height: w*0.55, background:'var(--color-primary)', display:'inline-block'}}/>
+        <span style={{width: stroke, height: w*0.85, background:'var(--color-primary)', display:'inline-block'}}/>
+        <span style={{width: stroke, height: w, background:'var(--color-primary)', display:'inline-block'}}/>
+        <span style={{width: stroke, height: w*0.7, background:'var(--color-outline)', display:'inline-block'}}/>
+      </span>
+      <span style={{fontWeight:700, letterSpacing:'-0.015em'}}>
+        Story<em style={{fontStyle:'italic', fontWeight:400, color:'var(--color-text-muted)'}}>Vault</em>
+      </span>
+    </span>
+  );
+}
+
+/* ─────────────────────────  SCREEN 1 · SIGN IN  ───────────────────────── */
+function SignIn() {
+  return (
+    <div className="frame">
+      <div className="signin">
+        <div className="corner-mark">
+          <Wordmark size={18} />
+        </div>
+        <div className="signature">est. mmxxv · a private library</div>
+
+        <div className="center">
+          <div className="frontispiece">
+            <div className="roman">Vol. I · No. 1</div>
+          </div>
+          <h1 className="title">The <em>Story</em><br/>Vault</h1>
+          <div className="ornament">· · ·</div>
+          <p className="subtitle">
+            A quiet place to keep the short fiction you mean to read.
+            Paste a link; we set the type.
+          </p>
+
+          <button className="signin-btn">
+            <span className="g">G</span>
+            Sign in with Google
+          </button>
+
+          <div className="footnote">
+            Your library is private. Stories are paginated, not paywalled.<sup> †</sup>
+          </div>
+        </div>
+
+        <div className="marginalia">
+          <em>marginalia —</em><br/>
+          A reader's library should feel like a desk, not a feed.
+        </div>
+        <div className="page-no">— i —</div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────  SCREEN 2 · LIBRARY  ───────────────────────── */
+const STORIES = [
+  { title: "Lotus Dew for the Emperor's Tea", author: "Vanessa Fogg", source: "Lightspeed Magazine", words: 7505, pct: 2,  pages: "1 of 51" },
+  { title: "Empathetic Psychosis",            author: "Justin C. Key",  source: "Lightspeed Magazine", words: 7357, pct: 0,  pages: "—" },
+  { title: "The Snatchers",                   author: "Eugenia Triantafyllou", source: "Uncanny Magazine", words: 8576, pct: 0,  pages: "—" },
+  { title: "Paper Airplane Poet",             author: "Sheri Singerling", source: "Clarkesworld Magazine", words: 8890, pct: 64, pages: "23 of 36" },
+  { title: "Senescence",                      author: "aegor ray",      source: "Strange Horizons", words: 3190, pct: 100, pages: "complete" },
+  { title: "The Glass City",                  author: "AnaMaria Curtis", source: "Uncanny Magazine", words: 3096, pct: 18, pages: "3 of 17" },
+];
+
+function Library() {
+  return (
+    <div className="frame">
+      <div className="lib">
+        <div className="lib-header">
+          <div className="left">
+            <Wordmark size={22} />
+            <span className="vol">a private reading room</span>
+          </div>
+          <div className="right">
+            <span className="email">millhouse5000@gmail.com</span>
+            <button className="icon-btn" title="Sign out"><Icon.Logout/></button>
+          </div>
+        </div>
+
+        <div className="lib-body">
+          {/* Intake card */}
+          <div className="intake">
+            <div className="intake-head">
+              <h2>Add a story to your library</h2>
+              <span className="intake-meta">accession · automatic</span>
+            </div>
+            <form onSubmit={(e)=>e.preventDefault()}>
+              <div className="input-wrap">
+                <span className="prefix">URL</span>
+                <input type="url" placeholder="https://lightspeedmagazine.com/fiction/…" />
+              </div>
+              <button className="add-btn" type="submit">
+                <Icon.Plus/> Catalogue
+              </button>
+            </form>
+          </div>
+
+          {/* Section head */}
+          <div className="lib-section-head">
+            <h2>Your library<span className="num">— six titles</span></h2>
+            <div className="filters">
+              <span className="item active">Recent</span>
+              <span className="item">In progress</span>
+              <span className="item">Finished</span>
+              <span className="item">By author</span>
+            </div>
+          </div>
+
+          {/* Cards */}
+          <div className="grid">
+            {STORIES.map((s, i) => (
+              <article className="card" key={i}>
+                <span className="corner-num">№ {String(i+1).padStart(2,'0')}</span>
+                <div className="source-overline">
+                  <span>{s.source}</span>
+                  <span className="ext"><Icon.ExtLink/></span>
+                </div>
+                <h3 className="title">{s.title}</h3>
+                <div className="author">{s.author}</div>
+                <div className="meta-foot">
+                  <div className="progress"><div className="bar" style={{width: `${s.pct}%`}}/></div>
+                  <div className="meta-row">
+                    <span className="pct">{s.pct === 100 ? 'finished' : s.pct === 0 ? 'unread' : `${s.pct}% · p. ${s.pages}`}</span>
+                    <span className="words">{s.words.toLocaleString()} words</span>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────  SCREEN 3 · READER  ───────────────────────── */
+function ReaderScreen({ withPopover = false }) {
+  return (
+    <div className="frame">
+      <div className={withPopover ? 'settings-screen' : 'reader'}>
+        {withPopover && <div className="underlay"/>}
+        <div className="reader-header">
+          <button className="back"><Icon.Back/> Back to library</button>
+          <div className="center-meta">Lightspeed Magazine · 7,505 words</div>
+          <div className="right">
+            <span className="pageno">page 2 of 51</span>
+            <button className="aa-btn">
+              <span className="small">A</span>
+              <span className="large">a</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="reader-body">
+          <div className="reader-page">
+            <div className="running-head">
+              <span>vanessa fogg</span>
+              <span>lotus dew for the emperor's tea</span>
+            </div>
+
+            <div className="chapter-mark">— i —</div>
+            <h1 className="story-title">Lotus Dew for the Emperor's Tea</h1>
+            <div className="byline">by Vanessa Fogg</div>
+            <div className="pub">Lightspeed Magazine · 2024</div>
+            <div className="ornament-rule">· · · ·</div>
+
+            <p className="body-text dropcap">
+              The newest girl had never dreamed of such an honor. Memorizing the various levels of salutations for different court officials; learning to arrange a plate of sweets just so; practicing how to hold her arm properly, gracefully, as she poured a cup of tea—
+            </p>
+            <p className="body-text">
+              She had never imagined she could be where she was now. On a blessed lake, breathing in the sacred scent of these lotuses. Touching their silken heads. Surrounded by color and beauty like a dream.
+            </p>
+            <p className="body-text">
+              Her neck ached as she bent her head to her task; her fingers trembled.
+            </p>
+          </div>
+        </div>
+
+        <div className="reader-footer">
+          <button className="nav-btn"><Icon.ChevL/> Previous</button>
+          <div className="progress-track">
+            <div className="indicator" style={{left: '4%'}}/>
+          </div>
+          <button className="nav-btn">Next <Icon.ChevR/></button>
+        </div>
+
+        {withPopover && (
+          <>
+            <div className="scrim"/>
+            <div className="popover">
+              <h4>Reading preferences</h4>
+              <div className="subtitle">set the type to your liking</div>
+              <hr className="pop-rule"/>
+
+              <div className="row">
+                <div className="row-label">Font size</div>
+                <div className="stepper">
+                  <button className="small">A−</button>
+                  <span className="val">20 px</span>
+                  <button className="large">A+</button>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="row-label">Typeface</div>
+                <div className="seg">
+                  <button className="opt active" style={{fontFamily:'var(--font-serif)'}}>Serif</button>
+                  <button className="opt" style={{fontFamily:'system-ui, sans-serif'}}>Sans</button>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="row-label">Theme</div>
+                <div className="themes">
+                  <div className="theme-swatch light">Aa</div>
+                  <div className="theme-swatch parchment selected">Aa</div>
+                  <div className="theme-swatch dark">Aa</div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="row-label">Line spacing</div>
+                <div className="seg">
+                  <button className="opt">Tight</button>
+                  <button className="opt active">Normal</button>
+                  <button className="opt">Loose</button>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="row-label">Margins</div>
+                <div className="seg">
+                  <button className="opt">Narrow</button>
+                  <button className="opt active">Normal</button>
+                  <button className="opt">Wide</button>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────  CANVAS  ───────────────────────── */
+function App() {
+  return (
+    <DesignCanvas title="StoryVault" subtitle="Academic Minimalism — a quiet, scholarly redesign" bg="#efe9dc">
+      <DCSection id="screens" title="Core screens" subtitle="The full app, four artboards.">
+        <DCArtboard id="signin"   label="Sign in"             width={1280} height={820}><SignIn/></DCArtboard>
+        <DCArtboard id="library"  label="Library"             width={1280} height={900}><Library/></DCArtboard>
+        <DCArtboard id="reader"   label="Reader"              width={1280} height={900}><ReaderScreen/></DCArtboard>
+        <DCArtboard id="settings" label="Reader · preferences" width={1280} height={900}><ReaderScreen withPopover/></DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

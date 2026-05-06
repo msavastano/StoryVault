@@ -15,6 +15,7 @@ There is no test runner configured. `next.config.ts` sets `eslint.ignoreDuringBu
 ## Environment
 
 - `NEXT_PUBLIC_GEMINI_API_KEY` — required at runtime; consumed client-side in `components/library.tsx` to call `@google/genai`. Without it, adding a story throws "Missing Gemini API Key".
+- `JINA_AI_KEY` — optional; passed as `Bearer` token to the Jina Reader proxy in `lib/fetchHtml.ts` (Server Action, never exposed to the browser). Without it, requests use Jina's free tier (rate-limited). **Do NOT prefix with `NEXT_PUBLIC_`** — this is a secret key used only server-side.
 - `DISABLE_HMR=true` — set by AI Studio to freeze webpack file-watching (prevents flicker during agent edits). Don't change this branch in `next.config.ts`.
 - `.env.example` documents the AI Studio variables (`GEMINI_API_KEY`, `APP_URL`); for local dev use `.env.local` with `NEXT_PUBLIC_GEMINI_API_KEY`.
 

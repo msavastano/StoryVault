@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/components/auth-provider';
 import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
-import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, Timestamp } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc } from 'firebase/firestore';
 import { fetchArticleContent } from '@/lib/fetchHtml';
 import { GoogleGenAI, Type } from '@google/genai';
 import { Reader } from '@/components/reader';
-import { BookOpen, LogOut, Plus, Trash2, Library, Book, ExternalLink } from 'lucide-react';
+import { LogOut, Plus, Trash2, ExternalLink } from 'lucide-react';
+import { Wordmark } from '@/components/wordmark';
 
 export interface Story {
   id: string;
@@ -23,15 +24,33 @@ export interface Story {
 }
 
 const LOADING_QUIPS = [
-  "Bribing the web scraper...",
-  "Explaining literature to the AI...",
-  "Removing annoying ads...",
-  "Negotiating with CSS classes...",
-  "Teaching the models how to read...",
-  "Counting words, one by one...",
-  "Translating metaphors...",
-  "Converting <div>s to <p>s with a hammer...",
+  'Bribing the web scraper...',
+  'Explaining literature to the AI...',
+  'Removing annoying ads...',
+  'Negotiating with CSS classes...',
+  'Teaching the models how to read...',
+  'Counting words, one by one...',
+  'Translating metaphors...',
+  'Converting <div>s to <p>s with a hammer...',
 ];
+
+type FilterKey = 'recent' | 'in-progress' | 'finished' | 'by-author';
+
+const NUMBER_WORDS = [
+  'zero', 'one', 'two', 'three', 'four', 'five',
+  'six', 'seven', 'eight', 'nine', 'ten',
+];
+
+function titleCount(n: number): string {
+  if (n === 0) return 'no titles';
+  const word = n <= 10 ? NUMBER_WORDS[n] : String(n);
+  return `— ${word} ${n === 1 ? 'title' : 'titles'}`;
+}
+
+function progressPct(current: number, total: number): number {
+  if (total <= 1) return current === 0 ? 0 : 100;
+  return Math.round((current / (total - 1)) * 100);
+}
 
 export default function AppMain() {
   const { user, logOut } = useAuth();
@@ -41,6 +60,7 @@ export default function AppMain() {
   const [stories, setStories] = useState<Story[]>([]);
   const [selectedStory, setSelectedStory] = useState<Story | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [filter, setFilter] = useState<FilterKey>('recent');
 
   useEffect(() => {
     if (!loading) {
@@ -90,17 +110,13 @@ export default function AppMain() {
         throw new Error('Missing Gemini API Key in the environment. Please configure it.');
       }
 
-      // Fetch via Jina Reader (Server Action) — bypasses Cloudflare bot
-      // challenges and returns clean markdown.
       const fetchResult = await fetchArticleContent(urlInput);
       if (!fetchResult.ok) {
         throw new Error(fetchResult.message);
       }
       const articleContent = fetchResult.content;
 
-      const ai = new GoogleGenAI({
-        apiKey: apiKey,
-      });
+      const ai = new GoogleGenAI({ apiKey });
 
       const response = await ai.models.generateContent({
         model: 'gemini-3.1-flash-lite-preview',
@@ -136,7 +152,7 @@ export default function AppMain() {
 
       const jsonStr = response.text?.trim();
       if (!jsonStr) throw new Error('Failed to parse content with AI');
-      
+
       const extracted = JSON.parse(jsonStr) as {
         title: string;
         author: string;
@@ -181,132 +197,184 @@ export default function AppMain() {
     }
   };
 
+  const visibleStories = useMemo(() => {
+    const list = [...stories];
+    if (filter === 'in-progress') {
+      return list.filter((s) => {
+        const total = s.totalPages || 1;
+        const current = s.currentPage || 0;
+        if (total <= 1) return false;
+        return current > 0 && current < total - 1;
+      });
+    }
+    if (filter === 'finished') {
+      return list.filter((s) => {
+        const total = s.totalPages || 1;
+        const current = s.currentPage || 0;
+        if (total <= 1) return false;
+        return current >= total - 1;
+      });
+    }
+    if (filter === 'by-author') {
+      return list.sort((a, b) => (a.author || '').localeCompare(b.author || ''));
+    }
+    return list;
+  }, [stories, filter]);
+
   if (selectedStory) {
-    return (
-      <Reader story={selectedStory} onBack={() => setSelectedStory(null)} />
-    );
+    return <Reader story={selectedStory} onBack={() => setSelectedStory(null)} />;
   }
 
+  const filters: { key: FilterKey; label: string }[] = [
+    { key: 'recent', label: 'Recent' },
+    { key: 'in-progress', label: 'In progress' },
+    { key: 'finished', label: 'Finished' },
+    { key: 'by-author', label: 'By author' },
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
-      <header className="bg-white border-b px-6 py-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-        <div className="flex items-center space-x-2">
-          <Library className="w-6 h-6 text-indigo-600" />
-          <h1 className="text-xl font-bold tracking-tight text-gray-900">StoryVault</h1>
+    <div className="sv-lib">
+      <div className="sv-lib-header">
+        <div className="left">
+          <Wordmark size={22} />
+          <span className="vol">a private reading room</span>
         </div>
-        <div className="flex items-center space-x-4">
-          <div className="text-sm text-gray-600 hidden sm:block">{user?.email}</div>
-          <button
-            onClick={logOut}
-            className="p-2 text-gray-500 hover:text-gray-900 transition-colors rounded-full hover:bg-gray-100"
-            title="Log out"
-          >
-            <LogOut className="w-5 h-5" />
+        <div className="right">
+          <span className="email">{user?.email}</span>
+          <button onClick={logOut} className="icon-btn" title="Sign out" aria-label="Sign out">
+            <LogOut className="w-4 h-4" />
           </button>
         </div>
-      </header>
+      </div>
 
-      <main className="max-w-5xl mx-auto px-6 py-8">
-        <section className="mb-12 bg-white rounded-2xl shadow-sm border p-6">
-          <h2 className="text-lg font-semibold mb-4 text-gray-900">Add a New Story</h2>
-          <form onSubmit={handleAddStory} className="flex flex-col sm:flex-row gap-3">
-            <input
-              type="url"
-              required
-              placeholder="Paste the URL of a short story..."
-              value={urlInput}
-              onChange={(e) => setUrlInput(e.target.value)}
-              className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50 focus:bg-white transition-colors"
-              disabled={loading}
-            />
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-75 disabled:cursor-not-allowed flex items-center justify-center min-w-[220px] font-medium tracking-wide"
-            >
+      <div className="sv-lib-body">
+        <div className="sv-intake">
+          <div className="intake-head">
+            <h2>Add a story to your library</h2>
+            <span className="intake-meta">accession · automatic</span>
+          </div>
+          <form onSubmit={handleAddStory}>
+            <div className="input-wrap">
+              <span className="prefix">URL</span>
+              <input
+                type="url"
+                required
+                placeholder="https://lightspeedmagazine.com/fiction/…"
+                value={urlInput}
+                onChange={(e) => setUrlInput(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+            <button type="submit" className="add-btn" disabled={loading}>
               {loading ? (
-                <span className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <>
+                  <span className="spin" />
                   {LOADING_QUIPS[loadingStep]}
-                </span>
+                </>
               ) : (
-                <span className="flex items-center gap-2">
-                  <Plus className="w-4 h-4" /> Add to Library
-                </span>
+                <>
+                  <Plus className="w-4 h-4" />
+                  Catalogue
+                </>
               )}
             </button>
           </form>
-          {errorMsg && (
-            <div className="mt-4 p-3 bg-red-50 text-red-600 border border-red-200 rounded-lg text-sm">
-              {errorMsg}
-            </div>
-          )}
-        </section>
+          {errorMsg && <div className="err">{errorMsg}</div>}
+        </div>
 
-        <section>
-          <h2 className="text-2xl font-bold mb-6 text-gray-900">Your Library</h2>
-          {stories.length === 0 ? (
-            <div className="text-center py-16 bg-gray-50 border-2 border-dashed rounded-xl text-gray-500">
-              <BookOpen className="w-12 h-12 mx-auto text-gray-400 mb-3" />
-              <p>Your library is empty.</p>
-              <p className="text-sm">Paste a URL above to start reading.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {stories.map((story) => {
-                const total = story.totalPages || 1;
-                const current = story.currentPage || 0;
-                const progressPercentage = total <= 1 ? (current === 0 ? 0 : 100) : Math.round((current / (total - 1)) * 100);
-                
-                return (
-                  <div
-                    key={story.id}
-                    onClick={() => setSelectedStory(story)}
-                    className="bg-white rounded-xl border p-5 shadow-sm hover:shadow-md transition-all cursor-pointer group flex flex-col h-full relative"
+        <div className="sv-lib-section-head">
+          <h2>
+            Your library
+            <span className="num">{titleCount(visibleStories.length)}</span>
+          </h2>
+          <div className="filters">
+            {filters.map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                className={`item${filter === f.key ? ' active' : ''}`}
+                onClick={() => setFilter(f.key)}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {visibleStories.length === 0 ? (
+          <div className="sv-empty">
+            <p className="line1">Your shelf is empty.</p>
+            <p className="line2">Paste a URL to begin your library.</p>
+          </div>
+        ) : (
+          <div className="sv-grid">
+            {visibleStories.map((story, i) => {
+              const total = story.totalPages || 1;
+              const current = story.currentPage || 0;
+              const pct = progressPct(current, total);
+              const pctText =
+                pct === 100
+                  ? 'finished'
+                  : pct === 0
+                  ? 'unread'
+                  : `${pct}% · p. ${current + 1} of ${total}`;
+              return (
+                <div
+                  key={story.id}
+                  role="button"
+                  tabIndex={0}
+                  className="sv-card"
+                  onClick={() => setSelectedStory(story)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelectedStory(story);
+                    }
+                  }}
+                >
+                  <span className="corner-num">№ {String(i + 1).padStart(2, '0')}</span>
+                  <button
+                    type="button"
+                    onClick={(e) => handleDelete(e, story.id)}
+                    className="delete-btn"
+                    title="Delete story"
+                    aria-label="Delete story"
                   >
-                    <button
-                      onClick={(e) => handleDelete(e, story.id)}
-                      className="absolute top-4 right-4 p-2 text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 rounded-full"
-                      title="Delete story"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                    <div className="flex-1">
-                      <h3 className="font-bold text-lg text-gray-900 leading-tight mb-2 pr-8">{story.title}</h3>
-                      <p className="text-sm font-medium text-indigo-600 mb-1">{story.author}</p>
-                      <div className="flex items-center gap-2 mb-4">
-                        <p className="text-xs text-gray-500 uppercase tracking-wider">{story.source}</p>
-                        {story.sourceUrl && (
-                          <a
-                            href={story.sourceUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="text-gray-400 hover:text-indigo-600 transition-colors"
-                            title="Open original article"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                          </a>
-                        )}
-                      </div>
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                  <div className="source-overline">
+                    <span>{story.source}</span>
+                    {story.sourceUrl && (
+                      <a
+                        href={story.sourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        title="Open original article"
+                      >
+                        <ExternalLink style={{ width: 11, height: 11 }} />
+                      </a>
+                    )}
+                  </div>
+                  <h3 className="title">{story.title}</h3>
+                  <div className="author">{story.author}</div>
+                  <div className="meta-foot">
+                    <div className="progress">
+                      <div className="bar" style={{ width: `${pct}%` }} />
                     </div>
-                    {/* Progress Bar & Meta footer */}
-                    <div className="mt-4 pt-4 border-t flex flex-col gap-2">
-                       <div className="w-full bg-gray-200 rounded-full h-1.5">
-                         <div className="bg-indigo-600 h-1.5 rounded-full" style={{ width: `${progressPercentage}%` }}></div>
-                       </div>
-                       <div className="flex items-center justify-between text-xs text-gray-500">
-                         <span>{progressPercentage}% read</span>
-                         {story.wordCount && <span>{story.wordCount.toLocaleString()} words</span>}
-                       </div>
+                    <div className="meta-row">
+                      <span className="pct">{pctText}</span>
+                      {story.wordCount !== undefined && (
+                        <span className="words">{story.wordCount.toLocaleString()} words</span>
+                      )}
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
-      </main>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

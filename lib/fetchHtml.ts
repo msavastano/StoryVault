@@ -12,12 +12,17 @@ export type FetchArticleResult =
 export async function fetchArticleContent(url: string): Promise<FetchArticleResult> {
   const proxied = `https://r.jina.ai/${url}`;
   try {
-    const res = await fetch(proxied, {
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      },
-    });
+    const headers: Record<string, string> = {
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    };
+
+    const jinaKey = process.env.JINA_AI_KEY;
+    if (jinaKey) {
+      headers['Authorization'] = `Bearer ${jinaKey}`;
+    }
+
+    const res = await fetch(proxied, { headers });
 
     if (!res.ok) {
       return {
