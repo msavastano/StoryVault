@@ -5,7 +5,7 @@ import { useAuth } from '@/components/auth-provider';
 import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc } from 'firebase/firestore';
 import { fetchArticleContent } from '@/lib/fetchHtml';
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel, Type, type } from '@google/genai';
 import { Reader } from '@/components/reader';
 import { LogOut, Plus, Trash2, ExternalLink } from 'lucide-react';
 import { Wordmark } from '@/components/wordmark';
@@ -119,13 +119,16 @@ export default function AppMain() {
       const ai = new GoogleGenAI({ apiKey });
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.1-flash-lite-preview',
+        model: 'gemini-3.1-flash-lite',
         contents: [
           {
             text: `You are an expert text extractor. I will provide article content (typically markdown, sometimes HTML) from a short story magazine. Extract the title, author, source magazine, and the main story content. Format the story content as clean, normalized HTML using ONLY <p>, <em>, <strong>, and <hr> tags. Strip any author bio, comments, navigation, or non-story content. Return a raw JSON object with the exact keys: title, author, source, and content.\n\nSOURCE CONTENT:\n${articleContent.substring(0, 200000)}`,
           },
         ],
         config: {
+          thinkingConfig: {
+            thinkingLevel: ThinkingLevel.MEDIUM,
+          },
           responseMimeType: 'application/json',
           maxOutputTokens: 32768,
           responseSchema: {
