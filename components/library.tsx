@@ -5,7 +5,7 @@ import { useAuth } from '@/components/auth-provider';
 import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc } from 'firebase/firestore';
 import { fetchArticleContent } from '@/lib/fetchHtml';
-import { GoogleGenAI, ThinkingLevel, Type, type } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 import { Reader } from '@/components/reader';
 import { LogOut, Plus, Trash2, ExternalLink } from 'lucide-react';
 import { Wordmark } from '@/components/wordmark';
