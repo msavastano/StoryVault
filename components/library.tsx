@@ -122,7 +122,11 @@ export default function AppMain() {
         model: 'gemini-3.1-flash-lite',
         contents: [
           {
-            text: `You are an expert text extractor. I will provide article content (typically markdown, sometimes HTML) from a short story magazine. Extract the title, author, source magazine, and the main story content. Format the story content as clean, normalized HTML using ONLY <p>, <em>, <strong>, and <hr> tags. Strip any author bio, comments, navigation, or non-story content. Return a raw JSON object with the exact keys: title, author, source, and content.\n\nSOURCE CONTENT:\n${articleContent.substring(0, 200000)}`,
+            text: `You are an expert text extractor. I will provide article content (typically markdown, sometimes HTML) from a short story magazine. Extract the title, author, source magazine, and the main story content.
+
+To find the author: many magazines print a byline immediately after the title in the form "_by_[Author Name](url)" and repeat it in a copyright line like "© 2025 by Author Name." When these are present, use them and copy the author name exactly as written, preserving any accents or diacritics. If they are not present, infer the author from whatever byline, header, or attribution the source provides. Never guess or invent an author who is not in the source; only use "Unknown" if the source contains no author attribution at all.
+
+Format the story content as clean, normalized HTML using ONLY <p>, <em>, <strong>, and <hr> tags. Strip any author bio, comments, navigation, or non-story content. Return a raw JSON object with the exact keys: title, author, source, and content.\n\nSOURCE CONTENT:\n${articleContent.substring(0, 200000)}`,
           },
         ],
         config: {
