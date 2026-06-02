@@ -328,6 +328,109 @@ html, body {
 }
 @keyframes sv-spin { to { transform: rotate(360deg); } }
 
+/* ── Gemini API key panel ───────────────────────────────── */
+.sv-keypanel { margin-bottom: 28px; }
+
+.sv-keypanel .key-active {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap;
+  background: var(--color-surface-container-low);
+  border: 1px solid var(--color-outline-variant);
+  border-radius: var(--radius);
+  padding: 14px 20px;
+}
+.sv-keypanel .key-status {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 14px; color: var(--color-text);
+}
+.sv-keypanel .key-status .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #4a8f5b; flex: none;
+}
+.sv-keypanel .key-hint { color: var(--color-text-subtle); font-style: italic; }
+.sv-keypanel .key-actions { display: flex; gap: 8px; }
+.sv-keypanel .link-btn {
+  background: none; border: 0; cursor: pointer;
+  font-family: var(--font-serif); font-size: 14px;
+  color: var(--color-text-subtle);
+  text-decoration: underline; text-underline-offset: 3px;
+  padding: 4px 6px;
+}
+.sv-keypanel .link-btn:hover { color: var(--color-text); }
+.sv-keypanel .link-btn.danger:hover { color: var(--color-destructive); }
+
+.sv-keypanel .key-setup {
+  background: var(--color-surface);
+  border: 1px solid var(--color-outline);
+  border-radius: var(--radius);
+  padding: 28px 32px;
+  box-shadow: var(--shadow-sm);
+}
+.sv-keypanel .key-setup .intake-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-bottom: 14px;
+}
+.sv-keypanel .key-setup h2 {
+  font-size: 22px; font-weight: 600;
+  letter-spacing: -0.01em; color: var(--color-text); margin: 0;
+}
+.sv-keypanel .key-setup .intake-meta {
+  font-style: italic; font-size: 13px; color: var(--color-text-subtle);
+}
+.sv-keypanel .key-explainer {
+  font-size: 15px; line-height: 1.6;
+  color: var(--color-text); margin: 0 0 14px;
+}
+.sv-keypanel .key-steps {
+  margin: 0 0 20px; padding-left: 20px;
+  font-size: 14px; line-height: 1.7; color: var(--color-text);
+}
+.sv-keypanel .key-steps li { margin-bottom: 4px; }
+.sv-keypanel .key-steps a {
+  color: var(--color-primary); text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.sv-keypanel .key-setup form {
+  display: flex; align-items: stretch; gap: 12px;
+}
+.sv-keypanel .key-setup .input-wrap {
+  flex: 1; display: flex; align-items: center; gap: 12px;
+  background: var(--color-surface-container-low);
+  border: 1px solid var(--color-outline-variant);
+  border-radius: var(--radius); padding: 0 16px;
+  transition: border-color var(--transition-fast);
+}
+.sv-keypanel .key-setup .input-wrap:focus-within { border-color: var(--color-primary); }
+.sv-keypanel .key-setup .input-wrap .prefix {
+  font-family: var(--font-mono); font-size: 12px;
+  color: var(--color-text-subtle); letter-spacing: 0.05em;
+  border-right: 1px solid var(--color-outline-variant);
+  padding-right: 12px; line-height: 1;
+}
+.sv-keypanel .key-setup input {
+  flex: 1; background: transparent; border: 0; outline: 0;
+  font-family: var(--font-mono); font-size: 15px;
+  color: var(--color-text); padding: 14px 0;
+}
+.sv-keypanel .key-setup input::placeholder { color: var(--color-text-subtle); }
+.sv-keypanel .key-setup .add-btn {
+  background: var(--color-primary); color: var(--color-on-primary);
+  border: 0; border-radius: var(--radius);
+  font-family: var(--font-serif); font-size: 16px; font-weight: 500;
+  padding: 0 26px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 10px;
+  transition: background var(--transition-fast); white-space: nowrap;
+}
+.sv-keypanel .key-setup .add-btn:hover:not(:disabled) { background: #4d4840; }
+.sv-keypanel .key-setup .add-btn:disabled { cursor: not-allowed; opacity: 0.5; }
+.sv-keypanel .key-setup .add-btn.ghost {
+  background: transparent; color: var(--color-text-subtle);
+  border: 1px solid var(--color-outline-variant);
+}
+.sv-keypanel .key-setup .add-btn.ghost:hover:not(:disabled) {
+  background: var(--color-surface-container-low); color: var(--color-text);
+}
+
 .sv-lib-section-head {
   display: flex; align-items: end; justify-content: space-between;
   margin-bottom: 24px;
