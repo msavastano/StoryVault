@@ -917,3 +917,97 @@ html, body {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 2px var(--color-surface-container-lowest), 0 0 0 3.5px var(--color-primary);
 }
+
+/* ── Responsive: tablets ────────────────────────────────────── */
+@media (max-width: 768px) {
+  .sv-signin { padding: 32px 24px; }
+  .sv-signin .corner-mark { top: 24px; left: 24px; }
+  .sv-signin .signature { top: 24px; right: 24px; }
+  .sv-signin h1.title { font-size: 60px; }
+  .sv-signin .subtitle { font-size: 19px; }
+  .sv-signin .marginalia,
+  .sv-signin .page-no { bottom: 28px; }
+  .sv-signin .marginalia { left: 24px; }
+  .sv-signin .page-no { right: 24px; }
+
+  .sv-lib-header { padding: 18px 24px 16px; }
+  .sv-lib-header::after { left: 24px; right: 24px; }
+  .sv-lib-body { padding: 32px 24px 40px; }
+
+  .sv-reader-header { padding: 16px 24px; }
+  .sv-reader-body { padding: 40px 24px 24px; }
+  .sv-reader-footer { padding: 16px 24px 22px; }
+  .sv-reader-page h1.story-title { font-size: 38px; }
+}
+
+/* ── Responsive: phones ─────────────────────────────────────── */
+@media (max-width: 640px) {
+  /* Sign-in: drop decorative absolutely-positioned bits that collide */
+  .sv-signin { padding: 24px 18px; }
+  .sv-signin .signature,
+  .sv-signin .marginalia { display: none; }
+  .sv-signin .frontispiece { padding: 16px 20px; margin-bottom: 28px; }
+  .sv-signin h1.title { font-size: 48px; }
+  .sv-signin .subtitle { font-size: 17px; margin-bottom: 32px; }
+  .sv-signin .signin-btn { font-size: 16px; padding: 13px 22px; }
+  .sv-signin .footnote { margin-top: 36px; }
+  .sv-signin .page-no { bottom: 18px; right: 18px; }
+
+  /* Library header */
+  .sv-lib-header { padding: 16px 18px 14px; }
+  .sv-lib-header::after { left: 18px; right: 18px; }
+  .sv-lib-header .left .vol { display: none; }
+  .sv-lib-header .right { gap: 12px; }
+  .sv-lib-header .right .email {
+    max-width: 42vw;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .sv-lib-body { padding: 24px 18px 36px; }
+
+  /* Intake + key panels: stack form vertically, full-width button */
+  .sv-intake { padding: 22px 18px; margin-bottom: 40px; }
+  .sv-intake::before { display: none; }
+  .sv-intake .intake-head { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .sv-intake form { flex-direction: column; }
+  .sv-intake .add-btn { justify-content: center; padding: 14px 26px; }
+
+  .sv-keypanel .key-setup { padding: 22px 18px; }
+  .sv-keypanel .key-setup .intake-head { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .sv-keypanel .key-setup form { flex-direction: column; }
+  .sv-keypanel .key-setup .add-btn { justify-content: center; padding: 14px 26px; }
+
+  /* Section head: stack title above filters; let filters scroll horizontally */
+  .sv-lib-section-head { flex-direction: column; align-items: flex-start; gap: 14px; }
+  .sv-lib-section-head h2 { font-size: 30px; }
+  .sv-lib-section-head h2 .num { font-size: 20px; margin-left: 10px; }
+  .sv-lib-section-head .filters {
+    gap: 18px; width: 100%;
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    white-space: nowrap; padding-bottom: 4px;
+  }
+  .sv-lib-section-head .filters .item { flex: none; }
+
+  .sv-card { min-height: 0; padding: 20px 20px 18px; }
+  .sv-card h3.title { font-size: 22px; }
+
+  /* Reader */
+  .sv-reader-header { padding: 14px 18px; gap: 10px; }
+  .sv-reader-header .center-meta { display: none; }
+  .sv-reader-header .pageno { display: none; }
+  .sv-reader-body { padding: 28px 20px 20px; }
+  .sv-reader-page h1.story-title { font-size: 30px; }
+  .sv-reader-page .running-head { margin-bottom: 36px; }
+  .sv-reader-footer { padding: 14px 18px 20px; }
+  .sv-reader-footer .progress-track { flex: 1 1 auto; margin: 0 14px; }
+  .sv-reader-footer .nav-btn { padding: 10px 12px; }
+
+  /* Popover → full-width bottom sheet so it never overflows the viewport */
+  .sv-popover {
+    position: fixed;
+    top: auto; bottom: 0; left: 0; right: 0;
+    width: auto;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+    box-shadow: 0 -8px 24px -8px rgba(40, 34, 24, 0.25);
+  }
+  .sv-popover::before { display: none; }
+}
