@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { clearGeminiKey } from '@/hooks/use-gemini-key';
 
 interface AuthContextType {
   user: User | null;
@@ -40,6 +41,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const logOut = async () => {
+    clearGeminiKey();
     await signOut(auth);
   };
 

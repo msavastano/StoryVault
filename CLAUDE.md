@@ -14,7 +14,7 @@ There is no test runner configured. `next.config.ts` sets `eslint.ignoreDuringBu
 
 ## Environment
 
-- `NEXT_PUBLIC_GEMINI_API_KEY` — required at runtime; consumed client-side in `components/library.tsx` to call `@google/genai`. Without it, adding a story throws "Missing Gemini API Key".
+- **Gemini API key — user-supplied at runtime, not an env var.** Each user pastes their own Gemini key into the "Connect your Gemini API key" panel in `components/library.tsx`. The key is held in `sessionStorage` (see `hooks/use-gemini-key.ts`), lives only for the browser tab/session, and is cleared on sign-out (`auth-provider.tsx` calls `clearGeminiKey()`). It is never sent to our servers or persisted to Firestore. The add-story form is disabled until a key is present. The old `NEXT_PUBLIC_GEMINI_API_KEY` env var is no longer read by the app.
 - `JINA_AI_KEY` — optional; passed as `Bearer` token to the Jina Reader proxy in `lib/fetchHtml.ts` (Server Action, never exposed to the browser). Without it, requests use Jina's free tier (rate-limited). **Do NOT prefix with `NEXT_PUBLIC_`** — this is a secret key used only server-side.
 - `DISABLE_HMR=true` — set by AI Studio to freeze webpack file-watching (prevents flicker during agent edits). Don't change this branch in `next.config.ts`.
 - `.env.example` documents the AI Studio variables (`GEMINI_API_KEY`, `APP_URL`); for local dev use `.env.local` with `NEXT_PUBLIC_GEMINI_API_KEY`.
@@ -24,6 +24,7 @@ There is no test runner configured. `next.config.ts` sets `eslint.ignoreDuringBu
 Next.js 15 App Router + React 19 client app. Single-user-scoped reading library backed by Firebase. There is no custom backend — the only server-side code is one Server Action.
 
 **Add-story flow** (`components/library.tsx#handleAddStory`):
+0. User must first supply their own Gemini API key (held in `sessionStorage` via `hooks/use-gemini-key.ts`); the URL form is disabled until then.
 1. User pastes URL → calls `fetchRawHtml(url)` from `lib/fetchHtml.ts` (a `'use server'` Server Action that bypasses browser CORS by fetching with a desktop UA).
 2. Raw HTML (truncated to 50,000 chars) is sent to Gemini (`gemini-3.1-flash-lite-preview`) with a JSON `responseSchema` that forces `{title, author, source, content}`. Gemini is instructed to return cleaned HTML using only `<p>`, `<em>`, `<strong>`, `<hr>`.
 3. Client computes `wordCount` and `totalPages` (see Pagination), then `addDoc` to `users/{uid}/stories`.

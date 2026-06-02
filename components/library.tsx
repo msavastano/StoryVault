@@ -7,8 +7,9 @@ import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, delete
 import { fetchArticleContent } from '@/lib/fetchHtml';
 import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 import { Reader } from '@/components/reader';
-import { LogOut, Plus, Trash2, ExternalLink } from 'lucide-react';
+import { LogOut, Plus, Trash2, ExternalLink, KeyRound, Check, X } from 'lucide-react';
 import { Wordmark } from '@/components/wordmark';
+import { useGeminiKey } from '@/hooks/use-gemini-key';
 
 export interface Story {
   id: string;
@@ -54,6 +55,9 @@ function progressPct(current: number, total: number): number {
 
 export default function AppMain() {
   const { user, logOut } = useAuth();
+  const { apiKey, hasKey, setApiKey, clearApiKey } = useGeminiKey();
+  const [keyInput, setKeyInput] = useState('');
+  const [editingKey, setEditingKey] = useState(false);
   const [urlInput, setUrlInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
@@ -102,14 +106,14 @@ export default function AppMain() {
     e.preventDefault();
     if (!urlInput.trim() || !user) return;
 
+    if (!apiKey) {
+      setErrorMsg('Add your Gemini API key above before cataloguing a story.');
+      return;
+    }
+
     setLoading(true);
     setErrorMsg(null);
     try {
-      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-      if (!apiKey) {
-        throw new Error('Missing Gemini API Key in the environment. Please configure it.');
-      }
-
       const fetchResult = await fetchArticleContent(urlInput);
       if (!fetchResult.ok) {
         throw new Error(fetchResult.message);
@@ -193,6 +197,21 @@ Format the story content as clean, normalized HTML using ONLY <p>, <em>, <strong
     }
   };
 
+  const handleSaveKey = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!keyInput.trim()) return;
+    setApiKey(keyInput);
+    setKeyInput('');
+    setEditingKey(false);
+    setErrorMsg(null);
+  };
+
+  const handleForgetKey = () => {
+    clearApiKey();
+    setKeyInput('');
+    setEditingKey(false);
+  };
+
   const handleDelete = async (e: React.MouseEvent, storyId: string) => {
     e.stopPropagation();
     e.preventDefault();
@@ -255,6 +274,79 @@ Format the story content as clean, normalized HTML using ONLY <p>, <em>, <strong
       </div>
 
       <div className="sv-lib-body">
+        <div className="sv-keypanel">
+          {hasKey && !editingKey ? (
+            <div className="key-active">
+              <div className="key-status">
+                <span className="dot" />
+                <KeyRound className="w-4 h-4" />
+                <span>
+                  Gemini API key active for this session
+                  <span className="key-hint"> · cleared when you sign out or close the browser</span>
+                </span>
+              </div>
+              <div className="key-actions">
+                <button type="button" className="link-btn" onClick={() => { setEditingKey(true); setKeyInput(''); }}>
+                  Replace
+                </button>
+                <button type="button" className="link-btn danger" onClick={handleForgetKey}>
+                  Forget
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="key-setup">
+              <div className="intake-head">
+                <h2>Connect your Gemini API key</h2>
+                <span className="intake-meta">required · your key</span>
+              </div>
+              <p className="key-explainer">
+                StoryVault uses Google&rsquo;s Gemini AI to read each article and pull out the clean
+                story text. To do that it needs <strong>your own free Gemini API key</strong>. The key
+                stays in this browser tab only &mdash; it is never sent to our servers and is wiped the
+                moment you sign out or close the browser. Any usage is billed to your own Google account
+                (Gemini has a free tier that is plenty for casual reading).
+              </p>
+              <ol className="key-steps">
+                <li>
+                  Open{' '}
+                  <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">
+                    Google AI Studio &rarr; API keys
+                    <ExternalLink style={{ width: 11, height: 11, marginLeft: 4, display: 'inline' }} />
+                  </a>{' '}
+                  and sign in with your Google account.
+                </li>
+                <li>Click <strong>Create API key</strong> and copy the value it gives you.</li>
+                <li>Paste it below and select <strong>Save key</strong>.</li>
+              </ol>
+              <form onSubmit={handleSaveKey}>
+                <div className="input-wrap">
+                  <span className="prefix">KEY</span>
+                  <input
+                    type="password"
+                    required
+                    autoComplete="off"
+                    spellCheck={false}
+                    placeholder="AIza…"
+                    value={keyInput}
+                    onChange={(e) => setKeyInput(e.target.value)}
+                  />
+                </div>
+                <button type="submit" className="add-btn" disabled={!keyInput.trim()}>
+                  <Check className="w-4 h-4" />
+                  Save key
+                </button>
+                {editingKey && hasKey && (
+                  <button type="button" className="add-btn ghost" onClick={() => { setEditingKey(false); setKeyInput(''); }}>
+                    <X className="w-4 h-4" />
+                    Cancel
+                  </button>
+                )}
+              </form>
+            </div>
+          )}
+        </div>
+
         <div className="sv-intake">
           <div className="intake-head">
             <h2>Add a story to your library</h2>
@@ -269,10 +361,10 @@ Format the story content as clean, normalized HTML using ONLY <p>, <em>, <strong
                 placeholder="https://lightspeedmagazine.com/fiction/…"
                 value={urlInput}
                 onChange={(e) => setUrlInput(e.target.value)}
-                disabled={loading}
+                disabled={loading || !hasKey}
               />
             </div>
-            <button type="submit" className="add-btn" disabled={loading}>
+            <button type="submit" className="add-btn" disabled={loading || !hasKey}>
               {loading ? (
                 <>
                   <span className="spin" />
