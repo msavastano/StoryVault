@@ -4,13 +4,15 @@ import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/components/auth-provider';
 import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc } from 'firebase/firestore';
-import { fetchArticleContent } from '@/lib/fetchHtml';
+import { fetchArticleContent, type FetchAttempt } from '@/lib/fetchHtml';
 import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 import { Reader } from '@/components/reader';
-import { LogOut, Plus, Trash2, ExternalLink, KeyRound, Check, X } from 'lucide-react';
+import { LogOut, Plus, Trash2, ExternalLink, KeyRound, Check, X, PenLine } from 'lucide-react';
 import { Wordmark } from '@/components/wordmark';
 import { useGeminiKey } from '@/hooks/use-gemini-key';
 import { countWords, paginateStory, savedPage } from '@/lib/paginate';
+import { plainTextToStoryHtml } from '@/lib/manual-story';
+import { ManualStoryForm, type ManualStoryValues } from '@/components/manual-story-form';
 
 export interface Story {
   id: string;
@@ -47,6 +49,33 @@ const LOADING_QUIPS = [
 
 type FilterKey = 'recent' | 'in-progress' | 'finished' | 'by-author';
 
+// Matches the `content` cap in firestore.rules (isValidStory).
+const MAX_CONTENT_CHARS = 900_000;
+
+// An add-story failure. `offerManual` is set when the story was never saved
+// because fetching or AI extraction failed, so pasting the text in by hand
+// gets around it. It stays off when saving itself failed.
+interface AddError {
+  message: string;
+  attempts?: FetchAttempt[];
+  offerManual: boolean;
+  url?: string;
+}
+
+class AddStoryError extends Error {
+  constructor(message: string, readonly attempts?: FetchAttempt[]) {
+    super(message);
+  }
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+}
+
 const NUMBER_WORDS = [
   'zero', 'one', 'two', 'three', 'four', 'five',
   'six', 'seven', 'eight', 'nine', 'ten',
@@ -73,7 +102,9 @@ export default function AppMain() {
   const [loadingStep, setLoadingStep] = useState(0);
   const [stories, setStories] = useState<Story[]>([]);
   const [selectedStory, setSelectedStory] = useState<Story | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [addError, setAddError] = useState<AddError | null>(null);
+  // The URL the manual form is adding a story for; null while it is closed.
+  const [manualUrl, setManualUrl] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterKey>('recent');
 
   useEffect(() => {
@@ -112,21 +143,42 @@ export default function AppMain() {
     return () => unsubscribe();
   }, [user]);
 
+  const saveStory = async (
+    story: { title: string; author: string; source: string; content: string },
+    sourceUrl: string,
+  ) => {
+    if (!user) throw new Error('Sign in to save stories.');
+    await addDoc(collection(db, `users/${user.uid}/stories`), {
+      title: story.title,
+      author: story.author,
+      source: story.source,
+      sourceUrl,
+      content: story.content,
+      wordCount: countWords(story.content),
+      totalPages: paginateStory(story.content).length,
+      currentPage: 0,
+      createdAt: serverTimestamp(),
+    });
+  };
+
   const handleAddStory = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!urlInput.trim() || !user) return;
+    const url = urlInput.trim();
+    if (!url || !user) return;
 
     if (!apiKey) {
-      setErrorMsg('Add your Gemini API key above before cataloguing a story.');
+      setAddError({ message: 'Add your Gemini API key above before cataloguing a story.', offerManual: false });
       return;
     }
 
     setLoading(true);
-    setErrorMsg(null);
+    setAddError(null);
+    setManualUrl(null);
+    let saving = false;
     try {
-      const fetchResult = await fetchArticleContent(urlInput);
+      const fetchResult = await fetchArticleContent(url);
       if (!fetchResult.ok) {
-        throw new Error(fetchResult.message);
+        throw new AddStoryError(`Couldn't fetch the story from ${hostOf(url)}.`, fetchResult.attempts);
       }
       const articleContent = fetchResult.content;
 
@@ -181,29 +233,45 @@ Format the story content as clean, normalized HTML using ONLY <p>, <em>, <strong
         content: string;
       };
 
-      const totalPages = paginateStory(extracted.content).length;
-      const wordCount = countWords(extracted.content);
-
-      const payload = {
-        title: extracted.title,
-        author: extracted.author,
-        source: extracted.source,
-        sourceUrl: urlInput.trim(),
-        content: extracted.content,
-        wordCount,
-        totalPages,
-        currentPage: 0,
-        createdAt: serverTimestamp(),
-      };
-
-      await addDoc(collection(db, `users/${user.uid}/stories`), payload);
+      saving = true;
+      await saveStory(extracted, url);
       setUrlInput('');
     } catch (err) {
       console.error(err);
-      setErrorMsg(err instanceof Error ? err.message : 'Failed to extract story. See console for details.');
+      setAddError({
+        message: err instanceof Error ? err.message : 'Failed to extract story. See console for details.',
+        attempts: err instanceof AddStoryError ? err.attempts : undefined,
+        offerManual: !saving,
+        url,
+      });
     } finally {
       setLoading(false);
     }
+  };
+
+  const openManualForm = (url: string) => {
+    setManualUrl(url);
+    setAddError(null);
+  };
+
+  const handleManualSave = async (values: ManualStoryValues) => {
+    const url = manualUrl ?? '';
+    const content = plainTextToStoryHtml(values.text);
+    if (!content) throw new Error('Paste the story text first.');
+    if (content.length > MAX_CONTENT_CHARS) {
+      throw new Error('This story is too long to save (the limit is roughly 150,000 words).');
+    }
+    await saveStory(
+      {
+        title: values.title.trim(),
+        author: values.author.trim() || 'Unknown',
+        source: values.source.trim() || hostOf(url),
+        content,
+      },
+      url,
+    );
+    setManualUrl(null);
+    setUrlInput('');
   };
 
   const handleSaveKey = (e: React.FormEvent) => {
@@ -212,7 +280,7 @@ Format the story content as clean, normalized HTML using ONLY <p>, <em>, <strong
     setApiKey(keyInput);
     setKeyInput('');
     setEditingKey(false);
-    setErrorMsg(null);
+    setAddError(null);
   };
 
   const handleForgetKey = () => {
@@ -395,7 +463,30 @@ Format the story content as clean, normalized HTML using ONLY <p>, <em>, <strong
               )}
             </button>
           </form>
-          {errorMsg && <div className="err">{errorMsg}</div>}
+          {addError && (
+            <div className="err" role="alert">
+              <p className="err-msg">{addError.message}</p>
+              {addError.attempts && (
+                <ul className="err-attempts">
+                  {addError.attempts.map((a) => (
+                    <li key={a.method}>
+                      <span className="err-method">{a.method}</span>
+                      <span>{a.reason}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {addError.offerManual && addError.url && (
+                <button type="button" className="err-action" onClick={() => openManualForm(addError.url!)}>
+                  <PenLine className="w-4 h-4" />
+                  Add it manually
+                </button>
+              )}
+            </div>
+          )}
+          {manualUrl !== null && (
+            <ManualStoryForm onSave={handleManualSave} onCancel={() => setManualUrl(null)} />
+          )}
         </div>
 
         <div className="sv-lib-section-head">
