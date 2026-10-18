@@ -25,7 +25,7 @@ Next.js 15 App Router + React 19 client app. Single-user-scoped reading library 
 
 **Add-story flow** (`components/library.tsx#handleAddStory`):
 0. User must first supply their own Gemini API key (held in `sessionStorage` via `hooks/use-gemini-key.ts`); the URL form is disabled until then.
-1. User pastes URL → calls `fetchRawHtml(url)` from `lib/fetchHtml.ts` (a `'use server'` Server Action that bypasses browser CORS by fetching with a desktop UA).
+1. User pastes URL → calls `fetchArticleContent(url)` from `lib/fetchHtml.ts` (a `'use server'` Server Action). It tries Jina Reader first (markdown, gets past Cloudflare bot checks) and falls back to a direct fetch with a desktop UA when Jina fails (some sites, e.g. Lightspeed Magazine, refuse Jina with a 403). The direct path strips scripts, styles and attributes from the HTML before returning it.
 2. The fetched content (truncated to `MAX_SOURCE_CHARS`, 300,000 chars) is sent to Gemini (`gemini-3.1-flash-lite`) with a JSON `responseSchema` that forces `{title, author, source, content}`. Gemini is instructed to return cleaned HTML using only `<p>`, `<em>`, `<strong>`, `<hr>`. The whole story comes back as output, so the output cap (`MAX_OUTPUT_TOKENS`, the model's 65,536 maximum) limits story length, not the input window; thinking tokens count against that cap, so thinking stays at `MINIMAL`.
 3. Client computes `wordCount` and `totalPages` (see Pagination), then `addDoc` to `users/{uid}/stories`.
 
@@ -35,7 +35,7 @@ Next.js 15 App Router + React 19 client app. Single-user-scoped reading library 
 
 ### Pagination invariant
 
-`library.tsx` (when saving) and `reader.tsx` (when displaying) **must** chunk identically. Both use the regex `/<p[\s\S]*?<\/p>|<hr>/gi` and group **4 elements per page**. If you change the chunking in one place, change it in the other, otherwise saved `totalPages` will diverge from the rendered page count and the `currentPage` clamp in `reader.tsx` will fire.
+Pagination lives in one place: `paginateStory` in `lib/paginate.ts`. `library.tsx` (saving `totalPages`, showing progress) and `reader.tsx` (rendering) both call it, so change pagination there only. It groups `<p>` blocks and `<hr>` scene breaks into pages of about `TARGET_WORDS_PER_PAGE` (300) words, never splitting a paragraph; the title page aims for 60% of that, and a short last page is folded into the one before. Page counts are always computed from `content`. Stories saved under the old 4-paragraphs-per-page rule have a stale `totalPages`; `savedPage` moves their bookmark to the same relative spot, and the reader writes the new `totalPages` with the moved `currentPage` once when such a story is opened.
 
 ### Firestore data model & rules
 
@@ -43,7 +43,7 @@ Next.js 15 App Router + React 19 client app. Single-user-scoped reading library 
 - `users/{userId}/preferences/reader` — single fixed-id doc holding `ReaderPreferences` (see `hooks/use-reader-preferences.ts`). The rule pins `prefId == 'reader'`.
 - `firestore.rules` is strict and load-bearing:
   - Global `match /{document=**} { allow read, write: if false; }` — only the explicitly-listed paths open access.
-  - **Stories**: updates restricted to **only the `currentPage` field** (`affectedKeys().hasOnly(['currentPage'])`). Adding any other mutable field requires both extending the rule and `isValidStory`.
+  - **Stories**: updates restricted to **only the `currentPage` and `totalPages` fields** (`affectedKeys().hasOnly(['currentPage', 'totalPages'])`; `totalPages` is updated once when an old story is repaginated). Adding any other mutable field requires both extending the rule and `isValidStory`.
   - **Preferences**: writes require the full doc (validated by `isValidReaderPreferences` + `hasOnly`/`hasAll` over the 6 fields). Adding a preference field requires updating the rule and the hook together.
   - `isValidStory` caps `content` at 900,000 chars; the 65,536-token output cap keeps `content` well under this.
   - `createdAt` (stories) and `updatedAt` (preferences) are required and must equal `request.time` on the relevant write — always use `serverTimestamp()`.

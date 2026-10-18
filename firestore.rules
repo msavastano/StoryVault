@@ -64,7 +64,7 @@ service cloud.firestore {
                     isValidId(userId) &&
                     isValidId(storyId) &&
                     isValidStory(incoming()) &&
-                    incoming().diff(existing()).affectedKeys().hasOnly(['currentPage']) &&
+                    incoming().diff(existing()).affectedKeys().hasOnly(['currentPage', 'totalPages']) &&
                     incoming().createdAt == existing().createdAt;
     }
 

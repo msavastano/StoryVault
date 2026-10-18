@@ -4,46 +4,140 @@ export type FetchArticleResult =
   | { ok: true; content: string }
   | { ok: false; message: string };
 
-// Routes through Jina Reader (https://r.jina.ai), which runs a headless browser
-// and returns clean markdown. This bypasses Cloudflare/bot challenges that block
-// plain server-side fetch from datacenter IPs (e.g. Uncanny Magazine, most
-// publishers behind Cloudflare). Returns a result object instead of throwing
-// so the actual error message survives Next.js's Server Action redaction in prod.
-export async function fetchArticleContent(url: string): Promise<FetchArticleResult> {
-  const proxied = `https://r.jina.ai/${url}`;
-  try {
-    const headers: Record<string, string> = {
-      'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    };
+const BROWSER_UA =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
+// Anything shorter than this is an error page or a stub, not a story.
+const MIN_CONTENT_CHARS = 200;
+const DIRECT_FETCH_TIMEOUT_MS = 20_000;
+
+// Fetches a story page for Gemini to extract. Tries Jina Reader first, then a
+// plain server-side fetch if Jina fails.
+//
+// Jina (https://r.jina.ai) runs a headless browser and returns clean markdown,
+// which gets past Cloudflare/bot challenges that block a plain fetch from
+// datacenter IPs (e.g. Uncanny Magazine). But some sites refuse Jina itself
+// (it answers 403 for them), and those often serve a plain fetch just fine,
+// so a direct fetch is the fallback.
+//
+// Returns a result object instead of throwing so the actual error message
+// survives Next.js's Server Action redaction in prod.
+export async function fetchArticleContent(url: string): Promise<FetchArticleResult> {
+  const viaJina = await fetchViaJina(url);
+  if (viaJina.ok) return viaJina;
+
+  const direct = await fetchDirect(url);
+  if (direct.ok) return direct;
+
+  return {
+    ok: false,
+    message: `Couldn't fetch ${url}. Reader proxy: ${viaJina.message} Direct fetch: ${direct.message}`,
+  };
+}
+
+async function fetchViaJina(url: string): Promise<FetchArticleResult> {
+  try {
+    const headers: Record<string, string> = { 'User-Agent': BROWSER_UA };
     const jinaKey = process.env.JINA_AI_KEY;
     if (jinaKey) {
       headers['Authorization'] = `Bearer ${jinaKey}`;
     }
 
-    const res = await fetch(proxied, { headers });
-
+    const res = await fetch(`https://r.jina.ai/${url}`, { headers });
     if (!res.ok) {
+      const detail = await readJinaError(res);
       return {
         ok: false,
-        message: `Reader proxy returned ${res.status} ${res.statusText} for ${url}.`,
+        message: `returned ${res.status} ${res.statusText}${detail ? ` (${detail})` : ''}.`,
       };
     }
 
     const content = await res.text();
-    if (!content || content.length < 200) {
-      return {
-        ok: false,
-        message: `Reader proxy returned no usable content (${content.length} chars). The source may be paywalled, gated, or blocking automated access.`,
-      };
+    if (content.length < MIN_CONTENT_CHARS) {
+      return { ok: false, message: `returned no usable content (${content.length} chars).` };
     }
-
     return { ok: true, content };
   } catch (error) {
-    return {
-      ok: false,
-      message: error instanceof Error ? error.message : String(error),
-    };
+    return { ok: false, message: `${errorText(error)}.` };
   }
+}
+
+// Jina explains its errors in a JSON body ({ message, readableMessage, ... }).
+// Surface that so the next failure says why, not just the status code.
+async function readJinaError(res: Response): Promise<string> {
+  try {
+    const body = await res.text();
+    try {
+      const json = JSON.parse(body);
+      const msg = json?.readableMessage || json?.message || json?.data?.message;
+      if (typeof msg === 'string') return truncate(msg);
+    } catch {
+      // Not JSON; fall through to the raw text.
+    }
+    return truncate(body.replace(/\s+/g, ' ').trim());
+  } catch {
+    return '';
+  }
+}
+
+async function fetchDirect(url: string): Promise<FetchArticleResult> {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': BROWSER_UA,
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+      redirect: 'follow',
+      signal: AbortSignal.timeout(DIRECT_FETCH_TIMEOUT_MS),
+    });
+    if (!res.ok) {
+      return { ok: false, message: `returned ${res.status} ${res.statusText}.` };
+    }
+
+    const html = await res.text();
+    if (isBotChallenge(html)) {
+      return { ok: false, message: 'the site served a bot check instead of the page.' };
+    }
+
+    const content = slimHtml(html);
+    const textLength = content.replace(/<[^>]+>/g, '').trim().length;
+    if (textLength < MIN_CONTENT_CHARS) {
+      return {
+        ok: false,
+        message: `returned no usable content (${textLength} chars of text). The page may be paywalled or rendered by JavaScript.`,
+      };
+    }
+    return { ok: true, content };
+  } catch (error) {
+    return { ok: false, message: `${errorText(error)}.` };
+  }
+}
+
+function isBotChallenge(html: string): boolean {
+  return (
+    /<title>\s*(Just a moment|Attention Required)/i.test(html) ||
+    html.includes('challenges.cloudflare.com') ||
+    html.includes('cf-chl-')
+  );
+}
+
+// Raw publisher HTML is mostly scripts, styles and attributes. Strip those so
+// the story text fits well inside the slice of content sent to Gemini.
+function slimHtml(html: string): string {
+  return html
+    .replace(/<head[\s\S]*?<\/head>/i, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<(script|style|noscript|svg|iframe|template|form)\b[\s\S]*?<\/\1>/gi, '')
+    .replace(/<(\/?[a-zA-Z][a-zA-Z0-9]*)\b[^>]*?(\/?)>/g, '<$1$2>')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function truncate(text: string, max = 200): string {
+  return text.length > max ? `${text.slice(0, max)}…` : text;
+}
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
