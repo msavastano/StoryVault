@@ -35,7 +35,7 @@ Next.js 15 App Router + React 19 client app. Single-user-scoped reading library 
 
 ### Pagination invariant
 
-`library.tsx` (when saving) and `reader.tsx` (when displaying) **must** chunk identically. Both use the regex `/<p[\s\S]*?<\/p>|<hr>/gi` and group **4 elements per page**. If you change the chunking in one place, change it in the other, otherwise saved `totalPages` will diverge from the rendered page count and the `currentPage` clamp in `reader.tsx` will fire.
+Pagination lives in one place: `paginateStory` in `lib/paginate.ts`. `library.tsx` (saving `totalPages`, showing progress) and `reader.tsx` (rendering) both call it, so change pagination there only. It groups `<p>` blocks and `<hr>` scene breaks into pages of about `TARGET_WORDS_PER_PAGE` (300) words, never splitting a paragraph; the title page aims for 60% of that, and a short last page is folded into the one before. Page counts are always computed from `content`. Stories saved under the old 4-paragraphs-per-page rule have a stale `totalPages`; `savedPage` moves their bookmark to the same relative spot, and the reader writes the new `totalPages` with the moved `currentPage` once when such a story is opened.
 
 ### Firestore data model & rules
 
@@ -43,7 +43,7 @@ Next.js 15 App Router + React 19 client app. Single-user-scoped reading library 
 - `users/{userId}/preferences/reader` — single fixed-id doc holding `ReaderPreferences` (see `hooks/use-reader-preferences.ts`). The rule pins `prefId == 'reader'`.
 - `firestore.rules` is strict and load-bearing:
   - Global `match /{document=**} { allow read, write: if false; }` — only the explicitly-listed paths open access.
-  - **Stories**: updates restricted to **only the `currentPage` field** (`affectedKeys().hasOnly(['currentPage'])`). Adding any other mutable field requires both extending the rule and `isValidStory`.
+  - **Stories**: updates restricted to **only the `currentPage` and `totalPages` fields** (`affectedKeys().hasOnly(['currentPage', 'totalPages'])`; `totalPages` is updated once when an old story is repaginated). Adding any other mutable field requires both extending the rule and `isValidStory`.
   - **Preferences**: writes require the full doc (validated by `isValidReaderPreferences` + `hasOnly`/`hasAll` over the 6 fields). Adding a preference field requires updating the rule and the hook together.
   - `isValidStory` caps `content` at 900,000 chars; the Gemini prompt's 50K input cap keeps output well under this.
   - `createdAt` (stories) and `updatedAt` (preferences) are required and must equal `request.time` on the relevant write — always use `serverTimestamp()`.

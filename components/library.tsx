@@ -10,6 +10,7 @@ import { Reader } from '@/components/reader';
 import { LogOut, Plus, Trash2, ExternalLink, KeyRound, Check, X } from 'lucide-react';
 import { Wordmark } from '@/components/wordmark';
 import { useGeminiKey } from '@/hooks/use-gemini-key';
+import { countWords, paginateStory, savedPage } from '@/lib/paginate';
 
 export interface Story {
   id: string;
@@ -171,9 +172,8 @@ Format the story content as clean, normalized HTML using ONLY <p>, <em>, <strong
         content: string;
       };
 
-      const elements = extracted.content.match(/<p[\s\S]*?<\/p>|<hr>/gi) || [];
-      const totalPages = Math.ceil((elements.length === 0 ? 1 : elements.length) / 4);
-      const wordCount = extracted.content.replace(/<[^>]*>?/gm, ' ').split(/\s+/).filter(w => w.length > 0).length;
+      const totalPages = paginateStory(extracted.content).length;
+      const wordCount = countWords(extracted.content);
 
       const payload = {
         title: extracted.title,
@@ -223,20 +223,28 @@ Format the story content as clean, normalized HTML using ONLY <p>, <em>, <strong
     }
   };
 
+  // Page counts come from the content, not the stored `totalPages`, so stories
+  // saved under older pagination rules still show the right progress.
+  const pageCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const s of stories) counts.set(s.id, paginateStory(s.content || '').length);
+    return counts;
+  }, [stories]);
+
   const visibleStories = useMemo(() => {
     const list = [...stories];
     if (filter === 'in-progress') {
       return list.filter((s) => {
-        const total = s.totalPages || 1;
-        const current = s.currentPage || 0;
+        const total = pageCounts.get(s.id) || 1;
+        const current = savedPage(s, total);
         if (total <= 1) return false;
         return current > 0 && current < total - 1;
       });
     }
     if (filter === 'finished') {
       return list.filter((s) => {
-        const total = s.totalPages || 1;
-        const current = s.currentPage || 0;
+        const total = pageCounts.get(s.id) || 1;
+        const current = savedPage(s, total);
         if (total <= 1) return false;
         return current >= total - 1;
       });
@@ -245,7 +253,7 @@ Format the story content as clean, normalized HTML using ONLY <p>, <em>, <strong
       return list.sort((a, b) => (a.author || '').localeCompare(b.author || ''));
     }
     return list;
-  }, [stories, filter]);
+  }, [stories, filter, pageCounts]);
 
   if (selectedStory) {
     return <Reader story={selectedStory} onBack={() => setSelectedStory(null)} />;
@@ -408,8 +416,8 @@ Format the story content as clean, normalized HTML using ONLY <p>, <em>, <strong
         ) : (
           <div className="sv-grid">
             {visibleStories.map((story, i) => {
-              const total = story.totalPages || 1;
-              const current = story.currentPage || 0;
+              const total = pageCounts.get(story.id) || 1;
+              const current = savedPage(story, total);
               const pct = progressPct(current, total);
               const pctText =
                 pct === 100
