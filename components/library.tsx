@@ -24,6 +24,15 @@ export interface Story {
   createdAt: any;
 }
 
+// The story comes back out as output, so the output cap is what limits story
+// length, not the 1M-token input window. 65,536 is Gemini 3.1 Flash-Lite's
+// maximum, and thinking tokens count against it, so thinking stays at MINIMAL
+// (Google's recommended level for extraction). That fits roughly 40,000 words.
+const MAX_OUTPUT_TOKENS = 65536;
+// About 50,000 words of source markdown, sized so a story that fits the output
+// cap isn't silently cut off on the way in.
+const MAX_SOURCE_CHARS = 300_000;
+
 const LOADING_QUIPS = [
   'Bribing the web scraper...',
   'Explaining literature to the AI...',
@@ -130,15 +139,15 @@ export default function AppMain() {
 
 To find the author: many magazines print a byline immediately after the title in the form "_by_[Author Name](url)" and repeat it in a copyright line like "© 2025 by Author Name." When these are present, use them and copy the author name exactly as written, preserving any accents or diacritics. If they are not present, infer the author from whatever byline, header, or attribution the source provides. Never guess or invent an author who is not in the source; only use "Unknown" if the source contains no author attribution at all.
 
-Format the story content as clean, normalized HTML using ONLY <p>, <em>, <strong>, and <hr> tags. Strip any author bio, comments, navigation, or non-story content. Return a raw JSON object with the exact keys: title, author, source, and content.\n\nSOURCE CONTENT:\n${articleContent.substring(0, 200000)}`,
+Format the story content as clean, normalized HTML using ONLY <p>, <em>, <strong>, and <hr> tags. Strip any author bio, comments, navigation, or non-story content. Return a raw JSON object with the exact keys: title, author, source, and content.\n\nSOURCE CONTENT:\n${articleContent.substring(0, MAX_SOURCE_CHARS)}`,
           },
         ],
         config: {
           thinkingConfig: {
-            thinkingLevel: ThinkingLevel.MEDIUM,
+            thinkingLevel: ThinkingLevel.MINIMAL,
           },
           responseMimeType: 'application/json',
-          maxOutputTokens: 32768,
+          maxOutputTokens: MAX_OUTPUT_TOKENS,
           responseSchema: {
             type: Type.OBJECT,
             properties: {
@@ -156,7 +165,7 @@ Format the story content as clean, normalized HTML using ONLY <p>, <em>, <strong
       if (finishReason && finishReason !== 'STOP') {
         throw new Error(
           finishReason === 'MAX_TOKENS'
-            ? 'The story was too long for the AI to extract in one pass. Try a shorter story, or contact the developer to raise the output cap.'
+            ? 'This story is too long for the AI to extract in one pass (the limit is roughly 40,000 words).'
             : `AI extraction stopped unexpectedly (finishReason: ${finishReason}).`,
         );
       }
