@@ -1,8 +1,12 @@
 'use server';
 
+export type FetchAttempt = { method: string; reason: string };
+
 export type FetchArticleResult =
   | { ok: true; content: string }
-  | { ok: false; message: string };
+  | { ok: false; message: string; attempts: FetchAttempt[] };
+
+type AttemptResult = { ok: true; content: string } | { ok: false; reason: string };
 
 const BROWSER_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -29,13 +33,18 @@ export async function fetchArticleContent(url: string): Promise<FetchArticleResu
   const direct = await fetchDirect(url);
   if (direct.ok) return direct;
 
+  const attempts = [
+    { method: 'Reader proxy', reason: viaJina.reason },
+    { method: 'Direct fetch', reason: direct.reason },
+  ];
   return {
     ok: false,
-    message: `Couldn't fetch ${url}. Reader proxy: ${viaJina.message} Direct fetch: ${direct.message}`,
+    message: `Couldn't fetch ${url}. ${attempts.map((a) => `${a.method}: ${a.reason}.`).join(' ')}`,
+    attempts,
   };
 }
 
-async function fetchViaJina(url: string): Promise<FetchArticleResult> {
+async function fetchViaJina(url: string): Promise<AttemptResult> {
   try {
     const headers: Record<string, string> = { 'User-Agent': BROWSER_UA };
     const jinaKey = process.env.JINA_AI_KEY;
@@ -48,25 +57,27 @@ async function fetchViaJina(url: string): Promise<FetchArticleResult> {
       const detail = await readJinaError(res);
       return {
         ok: false,
-        message: `returned ${res.status} ${res.statusText}${detail ? ` (${detail})` : ''}.`,
+        reason: `${res.status} ${res.statusText}${detail ? ` (${detail})` : ''}`,
       };
     }
 
     const content = await res.text();
     if (content.length < MIN_CONTENT_CHARS) {
-      return { ok: false, message: `returned no usable content (${content.length} chars).` };
+      return { ok: false, reason: `no usable content (${content.length} chars)` };
     }
     return { ok: true, content };
   } catch (error) {
-    return { ok: false, message: `${errorText(error)}.` };
+    return { ok: false, reason: errorText(error) };
   }
 }
 
 // Jina explains its errors in a JSON body ({ message, readableMessage, ... }).
-// Surface that so the next failure says why, not just the status code.
+// Surface that so the next failure says why, not just the status code. An HTML
+// error page (the site's own 403, passed through) adds nothing to the status.
 async function readJinaError(res: Response): Promise<string> {
   try {
     const body = await res.text();
+    if (body.trimStart().startsWith('<')) return '';
     try {
       const json = JSON.parse(body);
       const msg = json?.readableMessage || json?.message || json?.data?.message;
@@ -80,7 +91,7 @@ async function readJinaError(res: Response): Promise<string> {
   }
 }
 
-async function fetchDirect(url: string): Promise<FetchArticleResult> {
+async function fetchDirect(url: string): Promise<AttemptResult> {
   try {
     const res = await fetch(url, {
       headers: {
@@ -92,12 +103,12 @@ async function fetchDirect(url: string): Promise<FetchArticleResult> {
       signal: AbortSignal.timeout(DIRECT_FETCH_TIMEOUT_MS),
     });
     if (!res.ok) {
-      return { ok: false, message: `returned ${res.status} ${res.statusText}.` };
+      return { ok: false, reason: `${res.status} ${res.statusText}` };
     }
 
     const html = await res.text();
     if (isBotChallenge(html)) {
-      return { ok: false, message: 'the site served a bot check instead of the page.' };
+      return { ok: false, reason: 'the site served a bot check instead of the page' };
     }
 
     const content = slimHtml(html);
@@ -105,12 +116,12 @@ async function fetchDirect(url: string): Promise<FetchArticleResult> {
     if (textLength < MIN_CONTENT_CHARS) {
       return {
         ok: false,
-        message: `returned no usable content (${textLength} chars of text). The page may be paywalled or rendered by JavaScript.`,
+        reason: `no usable content (${textLength} chars of text); the page may be paywalled or rendered by JavaScript`,
       };
     }
     return { ok: true, content };
   } catch (error) {
-    return { ok: false, message: `${errorText(error)}.` };
+    return { ok: false, reason: errorText(error) };
   }
 }
 
