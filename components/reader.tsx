@@ -6,6 +6,7 @@ import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 import { db, handleFirestoreError, OperationType } from '@/lib/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '@/components/auth-provider';
+import { paginateStory, savedPage } from '@/lib/paginate';
 import {
   useReaderPreferences,
   FONT_SIZE_PX,
@@ -46,21 +47,25 @@ function getYear(createdAt: any): string | null {
 export function Reader({ story, onBack }: { story: Story; onBack: () => void }) {
   const { user } = useAuth();
   const { prefs, update } = useReaderPreferences();
-  const [currentPage, setCurrentPage] = useState(story.currentPage || 0);
+  const pages = useMemo(() => paginateStory(story.content), [story.content]);
+  const totalPages = pages.length;
+
+  const [currentPage, setCurrentPage] = useState(() => savedPage(story, totalPages));
   const [showSettings, setShowSettings] = useState(false);
   const settingsRef = useRef<HTMLDivElement>(null);
 
-  const pages = useMemo(() => {
-    const elements = story.content.match(/<p[\s\S]*?<\/p>|<hr>/gi) || [];
-    const result: string[] = [];
-    for (let i = 0; i < elements.length; i += 4) {
-      result.push(elements.slice(i, i + 4).join('\n'));
-    }
-    if (result.length === 0) result.push(story.content);
-    return result;
-  }, [story.content]);
-
-  const totalPages = pages.length;
+  // Stories saved under older pagination rules have a stale `totalPages`.
+  // Save the new count with the moved bookmark once, so later page turns only
+  // need to write `currentPage`.
+  useEffect(() => {
+    if (!user || !story.totalPages || story.totalPages === totalPages) return;
+    const storyRef = doc(db, `users/${user.uid}/stories/${story.id}`);
+    updateDoc(storyRef, { currentPage: savedPage(story, totalPages), totalPages }).catch((error) => {
+      console.warn('Could not save the updated page count for this story.', error);
+    });
+    // Runs once per opened story.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, story.id]);
 
   useEffect(() => {
     if (currentPage >= pages.length) {
