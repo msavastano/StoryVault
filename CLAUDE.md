@@ -26,7 +26,7 @@ Next.js 15 App Router + React 19 client app. Single-user-scoped reading library 
 **Add-story flow** (`components/library.tsx#handleAddStory`):
 0. User must first supply their own Gemini API key (held in `sessionStorage` via `hooks/use-gemini-key.ts`); the URL form is disabled until then.
 1. User pastes URL → calls `fetchArticleContent(url)` from `lib/fetchHtml.ts` (a `'use server'` Server Action). It tries Jina Reader first (markdown, gets past Cloudflare bot checks) and falls back to a direct fetch with a desktop UA when Jina fails (some sites, e.g. Lightspeed Magazine, refuse Jina with a 403). The direct path strips scripts, styles and attributes from the HTML before returning it.
-2. Raw HTML (truncated to 50,000 chars) is sent to Gemini (`gemini-3.1-flash-lite-preview`) with a JSON `responseSchema` that forces `{title, author, source, content}`. Gemini is instructed to return cleaned HTML using only `<p>`, `<em>`, `<strong>`, `<hr>`.
+2. The fetched content (truncated to `MAX_SOURCE_CHARS`, 300,000 chars) is sent to Gemini (`gemini-3.1-flash-lite`) with a JSON `responseSchema` that forces `{title, author, source, content}`. Gemini is instructed to return cleaned HTML using only `<p>`, `<em>`, `<strong>`, `<hr>`. The whole story comes back as output, so the output cap (`MAX_OUTPUT_TOKENS`, the model's 65,536 maximum) limits story length, not the input window; thinking tokens count against that cap, so thinking stays at `MINIMAL`.
 3. Client computes `wordCount` and `totalPages` (see Pagination), then `addDoc` to `users/{uid}/stories`.
 
 **Reading flow** (`components/reader.tsx`): pages are recomputed in the browser from `story.content`. Page advancement persists `currentPage` via `updateDoc`.
@@ -45,7 +45,7 @@ Pagination lives in one place: `paginateStory` in `lib/paginate.ts`. `library.ts
   - Global `match /{document=**} { allow read, write: if false; }` — only the explicitly-listed paths open access.
   - **Stories**: updates restricted to **only the `currentPage` and `totalPages` fields** (`affectedKeys().hasOnly(['currentPage', 'totalPages'])`; `totalPages` is updated once when an old story is repaginated). Adding any other mutable field requires both extending the rule and `isValidStory`.
   - **Preferences**: writes require the full doc (validated by `isValidReaderPreferences` + `hasOnly`/`hasAll` over the 6 fields). Adding a preference field requires updating the rule and the hook together.
-  - `isValidStory` caps `content` at 900,000 chars; the Gemini prompt's 50K input cap keeps output well under this.
+  - `isValidStory` caps `content` at 900,000 chars; the 65,536-token output cap keeps `content` well under this.
   - `createdAt` (stories) and `updatedAt` (preferences) are required and must equal `request.time` on the relevant write — always use `serverTimestamp()`.
 - After editing `firestore.rules`, redeploy via Firebase Console → Firestore → Rules, or `npx firebase deploy --only firestore:rules` (CLI auth required). Until rules are redeployed, writes from the live app will be silently rejected.
 - `firebase-blueprint.json` is a documentation/schema artifact for AI Studio; it does not enforce anything at runtime.
