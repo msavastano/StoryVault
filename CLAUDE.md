@@ -25,7 +25,7 @@ Next.js 15 App Router + React 19 client app. Single-user-scoped reading library 
 
 **Add-story flow** (`components/library.tsx#handleAddStory`):
 0. User must first supply their own Gemini API key (held in `sessionStorage` via `hooks/use-gemini-key.ts`); the URL form is disabled until then.
-1. User pastes URL → calls `fetchRawHtml(url)` from `lib/fetchHtml.ts` (a `'use server'` Server Action that bypasses browser CORS by fetching with a desktop UA).
+1. User pastes URL → calls `fetchArticleContent(url)` from `lib/fetchHtml.ts` (a `'use server'` Server Action). It tries Jina Reader first (markdown, gets past Cloudflare bot checks) and falls back to a direct fetch with a desktop UA when Jina fails (some sites, e.g. Lightspeed Magazine, refuse Jina with a 403). The direct path strips scripts, styles and attributes from the HTML before returning it.
 2. Raw HTML (truncated to 50,000 chars) is sent to Gemini (`gemini-3.1-flash-lite-preview`) with a JSON `responseSchema` that forces `{title, author, source, content}`. Gemini is instructed to return cleaned HTML using only `<p>`, `<em>`, `<strong>`, `<hr>`.
 3. Client computes `wordCount` and `totalPages` (see Pagination), then `addDoc` to `users/{uid}/stories`.
 
